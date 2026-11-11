@@ -1,0 +1,841 @@
+{
+ "project": {
+  "name": {
+   "en": "Demo Factory",
+   "zh": "示例工厂"
+  },
+  "floorplan": "floorplan.png",
+  "m_per_px": 0.06,
+  "overview_width": 2400
+ },
+ "areas": [
+  {
+   "id": "WH",
+   "name": {
+    "en": "Warehouse",
+    "zh": "仓库"
+   },
+   "rect": [
+    50,
+    50,
+    850,
+    950
+   ]
+  },
+  {
+   "id": "PROD",
+   "name": {
+    "en": "Production",
+    "zh": "生产区"
+   },
+   "rect": [
+    850,
+    50,
+    1650,
+    650
+   ]
+  },
+  {
+   "id": "OFF",
+   "name": {
+    "en": "Office",
+    "zh": "办公区"
+   },
+   "rect": [
+    850,
+    650,
+    1650,
+    950
+   ]
+  }
+ ],
+ "idf": [
+  [
+   870,
+   900
+  ]
+ ],
+ "antennas": [
+  {
+   "id": "P1",
+   "pos": [
+    1000,
+    200
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "P4",
+   "pos": [
+    1000,
+    500
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "O1",
+   "pos": [
+    1000,
+    800
+   ],
+   "area": "OFF"
+  },
+  {
+   "id": "P2",
+   "pos": [
+    1250,
+    200
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "P5",
+   "pos": [
+    1250,
+    500
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "O2",
+   "pos": [
+    1250,
+    800
+   ],
+   "area": "OFF"
+  },
+  {
+   "id": "P3",
+   "pos": [
+    1500,
+    200
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "P6",
+   "pos": [
+    1500,
+    500
+   ],
+   "area": "PROD"
+  },
+  {
+   "id": "O3",
+   "pos": [
+    1500,
+    800
+   ],
+   "area": "OFF"
+  },
+  {
+   "id": "W1",
+   "pos": [
+    700,
+    250
+   ],
+   "area": "WH"
+  },
+  {
+   "id": "W4",
+   "pos": [
+    700,
+    750
+   ],
+   "area": "WH"
+  },
+  {
+   "id": "W2",
+   "pos": [
+    450,
+    250
+   ],
+   "area": "WH"
+  },
+  {
+   "id": "W5",
+   "pos": [
+    450,
+    750
+   ],
+   "area": "WH"
+  },
+  {
+   "id": "W3",
+   "pos": [
+    200,
+    250
+   ],
+   "area": "WH"
+  },
+  {
+   "id": "W6",
+   "pos": [
+    200,
+    750
+   ],
+   "area": "WH"
+  }
+ ],
+ "boosters": [
+  {
+   "id": "A",
+   "power_dbm": 27,
+   "pos": [
+    890,
+    900
+   ],
+   "donor": [
+    880,
+    945
+   ],
+   "label_side": "R",
+   "location": {
+    "en": "IDF (office, SW corner)",
+    "zh": "IDF 弱电间（办公区西南角）"
+   },
+   "area": {
+    "en": "Production + Office",
+    "zh": "生产区 + 办公区"
+   },
+   "feed": [
+    [
+     890,
+     900
+    ],
+    [
+     890,
+     860
+    ]
+   ],
+   "tree": {
+    "type": "coupler",
+    "id": "cA0",
+    "pos": [
+     890,
+     860
+    ],
+    "value": 10,
+    "coupled": {
+     "path": [
+      [
+       890,
+       860
+      ],
+      [
+       1000,
+       860
+      ]
+     ],
+     "node": {
+      "type": "coupler",
+      "id": "cO1",
+      "pos": [
+       1000,
+       860
+      ],
+      "value": 8,
+      "coupled": {
+       "path": [
+        [
+         1000,
+         860
+        ],
+        [
+         1000,
+         800
+        ]
+       ],
+       "node": {
+        "type": "antenna",
+        "id": "O1"
+       }
+      },
+      "through": {
+       "path": [
+        [
+         1000,
+         860
+        ],
+        [
+         1250,
+         860
+        ]
+       ],
+       "node": {
+        "type": "coupler",
+        "id": "cO2",
+        "pos": [
+         1250,
+         860
+        ],
+        "value": 5,
+        "coupled": {
+         "path": [
+          [
+           1250,
+           860
+          ],
+          [
+           1250,
+           800
+          ]
+         ],
+         "node": {
+          "type": "antenna",
+          "id": "O2"
+         }
+        },
+        "through": {
+         "path": [
+          [
+           1250,
+           860
+          ],
+          [
+           1500,
+           860
+          ],
+          [
+           1500,
+           800
+          ]
+         ],
+         "node": {
+          "type": "antenna",
+          "id": "O3"
+         }
+        }
+       }
+      }
+     }
+    },
+    "through": {
+     "path": [
+      [
+       890,
+       860
+      ],
+      [
+       890,
+       350
+      ],
+      [
+       900,
+       350
+      ]
+     ],
+     "node": {
+      "type": "splitter",
+      "id": "S1",
+      "pos": [
+       900,
+       350
+      ],
+      "outputs": [
+       {
+        "path": [
+         [
+          900,
+          350
+         ],
+         [
+          930,
+          350
+         ],
+         [
+          930,
+          260
+         ],
+         [
+          1000,
+          260
+         ]
+        ],
+        "node": {
+         "type": "coupler",
+         "id": "cP1",
+         "pos": [
+          1000,
+          260
+         ],
+         "value": 8,
+         "coupled": {
+          "path": [
+           [
+            1000,
+            260
+           ],
+           [
+            1000,
+            200
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "P1"
+          }
+         },
+         "through": {
+          "path": [
+           [
+            1000,
+            260
+           ],
+           [
+            1250,
+            260
+           ]
+          ],
+          "node": {
+           "type": "coupler",
+           "id": "cP2",
+           "pos": [
+            1250,
+            260
+           ],
+           "value": 5,
+           "coupled": {
+            "path": [
+             [
+              1250,
+              260
+             ],
+             [
+              1250,
+              200
+             ]
+            ],
+            "node": {
+             "type": "antenna",
+             "id": "P2"
+            }
+           },
+           "through": {
+            "path": [
+             [
+              1250,
+              260
+             ],
+             [
+              1500,
+              260
+             ],
+             [
+              1500,
+              200
+             ]
+            ],
+            "node": {
+             "type": "antenna",
+             "id": "P3"
+            }
+           }
+          }
+         }
+        }
+       },
+       {
+        "path": [
+         [
+          900,
+          350
+         ],
+         [
+          930,
+          350
+         ],
+         [
+          930,
+          440
+         ],
+         [
+          1000,
+          440
+         ]
+        ],
+        "node": {
+         "type": "coupler",
+         "id": "cP4",
+         "pos": [
+          1000,
+          440
+         ],
+         "value": 8,
+         "coupled": {
+          "path": [
+           [
+            1000,
+            440
+           ],
+           [
+            1000,
+            500
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "P4"
+          }
+         },
+         "through": {
+          "path": [
+           [
+            1000,
+            440
+           ],
+           [
+            1250,
+            440
+           ]
+          ],
+          "node": {
+           "type": "coupler",
+           "id": "cP5",
+           "pos": [
+            1250,
+            440
+           ],
+           "value": 5,
+           "coupled": {
+            "path": [
+             [
+              1250,
+              440
+             ],
+             [
+              1250,
+              500
+             ]
+            ],
+            "node": {
+             "type": "antenna",
+             "id": "P5"
+            }
+           },
+           "through": {
+            "path": [
+             [
+              1250,
+              440
+             ],
+             [
+              1500,
+              440
+             ],
+             [
+              1500,
+              500
+             ]
+            ],
+            "node": {
+             "type": "antenna",
+             "id": "P6"
+            }
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": "B",
+   "power_dbm": 27,
+   "pos": [
+    860,
+    900
+   ],
+   "donor": [
+    840,
+    945
+   ],
+   "label_side": "L",
+   "location": {
+    "en": "IDF (office, SW corner)",
+    "zh": "IDF 弱电间（办公区西南角）"
+   },
+   "area": {
+    "en": "Warehouse",
+    "zh": "仓库"
+   },
+   "feed": [
+    [
+     860,
+     900
+    ],
+    [
+     860,
+     500
+    ],
+    [
+     840,
+     500
+    ]
+   ],
+   "tree": {
+    "type": "splitter",
+    "id": "S2",
+    "pos": [
+     840,
+     500
+    ],
+    "outputs": [
+     {
+      "path": [
+       [
+        840,
+        500
+       ],
+       [
+        810,
+        500
+       ],
+       [
+        810,
+        310
+       ],
+       [
+        700,
+        310
+       ]
+      ],
+      "node": {
+       "type": "coupler",
+       "id": "cW1",
+       "pos": [
+        700,
+        310
+       ],
+       "value": 8,
+       "coupled": {
+        "path": [
+         [
+          700,
+          310
+         ],
+         [
+          700,
+          250
+         ]
+        ],
+        "node": {
+         "type": "antenna",
+         "id": "W1"
+        }
+       },
+       "through": {
+        "path": [
+         [
+          700,
+          310
+         ],
+         [
+          450,
+          310
+         ]
+        ],
+        "node": {
+         "type": "coupler",
+         "id": "cW2",
+         "pos": [
+          450,
+          310
+         ],
+         "value": 5,
+         "coupled": {
+          "path": [
+           [
+            450,
+            310
+           ],
+           [
+            450,
+            250
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "W2"
+          }
+         },
+         "through": {
+          "path": [
+           [
+            450,
+            310
+           ],
+           [
+            200,
+            310
+           ],
+           [
+            200,
+            250
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "W3"
+          }
+         }
+        }
+       }
+      }
+     },
+     {
+      "path": [
+       [
+        840,
+        500
+       ],
+       [
+        810,
+        500
+       ],
+       [
+        810,
+        690
+       ],
+       [
+        700,
+        690
+       ]
+      ],
+      "node": {
+       "type": "coupler",
+       "id": "cW4",
+       "pos": [
+        700,
+        690
+       ],
+       "value": 8,
+       "coupled": {
+        "path": [
+         [
+          700,
+          690
+         ],
+         [
+          700,
+          750
+         ]
+        ],
+        "node": {
+         "type": "antenna",
+         "id": "W4"
+        }
+       },
+       "through": {
+        "path": [
+         [
+          700,
+          690
+         ],
+         [
+          450,
+          690
+         ]
+        ],
+        "node": {
+         "type": "coupler",
+         "id": "cW5",
+         "pos": [
+          450,
+          690
+         ],
+         "value": 5,
+         "coupled": {
+          "path": [
+           [
+            450,
+            690
+           ],
+           [
+            450,
+            750
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "W5"
+          }
+         },
+         "through": {
+          "path": [
+           [
+            450,
+            690
+           ],
+           [
+            200,
+            690
+           ],
+           [
+            200,
+            750
+           ]
+          ],
+          "node": {
+           "type": "antenna",
+           "id": "W6"
+          }
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "views": [
+  {
+   "title": {
+    "en": "Production + Office (Booster A, 9 antennas)",
+    "zh": "生产区 + 办公区（主机 A，9 支天线）"
+   },
+   "boosters": [
+    "A"
+   ],
+   "crop": [
+    800,
+    100,
+    1640,
+    960
+   ],
+   "file": {
+    "en": "Production_Office",
+    "zh": "生产区_办公区"
+   }
+  },
+  {
+   "title": {
+    "en": "Warehouse (Booster B, 6 antennas)",
+    "zh": "仓库（主机 B，6 支天线）"
+   },
+   "boosters": [
+    "B"
+   ],
+   "crop": [
+    60,
+    120,
+    940,
+    960
+   ],
+   "file": {
+    "en": "Warehouse",
+    "zh": "仓库"
+   },
+   "notes": [
+    {
+     "en": "Booster B shares the IDF with Booster A; its cable enters the warehouse through the shared wall.",
+     "zh": "主机 B 与主机 A 同在 IDF；线缆穿共用墙进入仓库。"
+    }
+   ]
+  }
+ ]
+}
