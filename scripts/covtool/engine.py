@@ -109,47 +109,63 @@ def evaluate_booster(b, d, cfg, power=None, values=None):
     return res
 
 
-def score(res, cfg):
-    ps = [r["out_dbm"] for r in res]
-    if round(max(ps), 1) > cfg["antenna_output"]["max_dbm"]:
-        return None
-    mu = sum(ps) / len(ps)
-    o = cfg["optimizer"]
-    return min(ps) - o["w_spread"] * (max(ps) - min(ps)) - o["w_mad"] * sum(abs(p - mu) for p in ps) / len(ps)
+def output_in_window(power, cfg):
+    limits = cfg["antenna_output"]
+    return limits["min_dbm"] < power < limits["max_dbm"]
+
+
+def _rank_outputs(results, cfg):
+    """Rank by feasibility first, then by the previous balance score."""
+    levels = [row["out_dbm"] for row in results]
+    limits = cfg["antenna_output"]
+    low, high = limits["min_dbm"], limits["max_dbm"]
+    invalid = sum(not output_in_window(level, cfg) for level in levels)
+    distance = sum(max(low - level, level - high, 0) for level in levels)
+    mean = sum(levels) / len(levels)
+    optimizer = cfg["optimizer"]
+    spread = max(levels) - min(levels)
+    mean_deviation = sum(abs(level - mean) for level in levels) / len(levels)
+    quality = min(levels) - optimizer["w_spread"] * spread - optimizer["w_mad"] * mean_deviation
+    return (-distance, -invalid, quality)
 
 
 def optimise_booster(b, d, cfg, powers=None, fixed=True):
-    """Pick coupler values (and power if powers given) maximising the score.
+    """Find the lowest requested power with a feasible coupler assignment."""
+    couplers = couplers_of(b["tree"])
+    options = [
+        [node["value"]] if node.get("lock") and node.get("value") is not None
+        else sorted(cfg["couplers"])
+        for node in couplers
+    ]
+    for power in sorted(set(powers or [b["power_dbm"]])):
+        def rank(values):
+            return _rank_outputs(evaluate_booster(b, d, cfg, power, list(values)), cfg)
 
-    Couplers whose node has "lock": true keep their value.
-    Returns (score, power, values) or None if no combination respects max_dbm.
-    """
-    cps = couplers_of(b["tree"])
-    opts = [[c["value"]] if c.get("lock") and c.get("value") else sorted(cfg["couplers"]) for c in cps]
-    powers = powers or [b["power_dbm"]]
-    best = None
-    for P in powers:
-        if len(cps) <= cfg["optimizer"]["brute_force_max_couplers"]:
-            for vals in itertools.product(*opts):
-                s = score(evaluate_booster(b, d, cfg, P, list(vals)), cfg)
-                if s is not None and (best is None or s > best[0]):
-                    best = (s, P, list(vals))
-        else:  # coordinate descent from all-10 dB (lowest through loss, safest start is all-5? try both)
-            for start in (max(cfg["couplers"]), min(cfg["couplers"])):
-                vals = [o[0] if len(o) == 1 else start for o in opts]
-                cur = score(evaluate_booster(b, d, cfg, P, vals), cfg)
+        if len(couplers) <= cfg["optimizer"]["brute_force_max_couplers"]:
+            best = max((rank(values), values) for values in itertools.product(*options))
+        else:
+            candidates = []
+            for use_minimum in (False, True):
+                values = [choices[0] if use_minimum else choices[-1] for choices in options]
+                current = rank(values)
                 improved = True
                 while improved:
                     improved = False
-                    for i, o in enumerate(opts):
-                        for v in o:
-                            t = vals[:]; t[i] = v
-                            s = score(evaluate_booster(b, d, cfg, P, t), cfg)
-                            if s is not None and (cur is None or s > cur + 1e-9):
-                                vals, cur, improved = t, s, True
-                if cur is not None and (best is None or cur > best[0]):
-                    best = (cur, P, vals)
-    return best
+                    for index, choices in enumerate(options):
+                        for value in choices:
+                            trial = values.copy()
+                            trial[index] = value
+                            candidate = rank(trial)
+                            if candidate > current:
+                                values = trial
+                                current = candidate
+                                improved = True
+                candidates.append((current, tuple(values)))
+            best = max(candidates)
+        ranks, values = best
+        if ranks[1] == 0:
+            return ranks[2], power, list(values)
+    return None
 
 
 def apply_values(b, vals):

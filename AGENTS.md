@@ -2,9 +2,7 @@
 
 This repository is an agent skill for designing indoor cellular signal-booster coverage plans.
 
-**Before doing any design work, read `SKILL.md` in full, then `references/design-rules.md` and
-`references/design-file-format.md`.** Follow the workflow in `SKILL.md` step by step and stop for
-the user's confirmation after every step.
+Read `SKILL.md` and the relevant design references before working on a coverage plan. Follow its stage order and reuse already confirmed decisions.
 
 Setup: `pip install -r requirements.txt` (Python 3.9+, Pillow, PyYAML). For Chinese drawings a CJK
 font is needed (Noto Sans CJK, PingFang, Microsoft YaHei …); add its path to `fonts:` in

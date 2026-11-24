@@ -12,9 +12,13 @@ drawings + bill of materials, in **English and Chinese**.
 |---|---|
 | ![overview](examples/demo-factory/output/en/Overview.png) | ![area](examples/demo-factory/output/en/Warehouse.png) |
 
+## Supplement (2026-11-24)
+
+The [dated supplement in SKILL.md](SKILL.md#补充规则2026-11-24) adds the owner's five requirements while retaining applicable existing guidance: establish coverage area before layout; space antennas evenly using coverage needs; fix booster locations and routing/components before power selection; use actual regional models and required bands; and use this owner's 5D/LMR400 project conventions with frequency-specific loss data. Added cable to attenuate one excessive branch requires confirmation. See [regional equipment](references/regional-equipment.md). This update also syncs the previously reviewed local multi-floor, panel-antenna and strict-output checks.
+
 ## What it does
 
-- **Step-by-step workflow** with a confirmation stop after every step (`SKILL.md`).
+- **Step-by-step workflow** with confirmation at design decisions that need user input (`SKILL.md`).
 - **Design rules** learned from real projects (`references/design-rules.md`): IDF-first booster placement,
   one cable per booster, splitter vs coupler choice, split only where cables diverge, no duplicated
   runs, aligned couplers, 0–8 dBm antenna window, and more.

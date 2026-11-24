@@ -1,5 +1,5 @@
 """Design-rule checks. Each rule comes from a real correction made during design reviews."""
-from .engine import antenna_index, branches, node_pos, manhattan, all_segments, couplers_of
+from .engine import antenna_index, branches, node_pos, manhattan, all_segments, couplers_of, output_in_window
 
 
 def expand(pts):
@@ -127,11 +127,10 @@ def lint(d, cfg, results):
                              "antennas would drop below the minimum — then add `location_reason`")
 
         for r in results.get(bid, []):
-            p = round(r["out_dbm"], 1)
-            if p > hi:
-                errs.append(f"[{bid}] antenna {r['antenna']} output {p} dBm > {hi} dBm")
-            if p < lo:
-                errs.append(f"[{bid}] antenna {r['antenna']} output {p} dBm < {lo} dBm")
+            power = r["out_dbm"]
+            if not output_in_window(power, cfg):
+                errs.append(f"[{bid}] antenna {r['antenna']} output {power:.6g} dBm "
+                             f"outside strict range {lo} < P < {hi} dBm")
         if any(c.get("value") is None for c in couplers_of(b["tree"])):
             errs.append(f"[{bid}] couplers without value — run optimize")
 

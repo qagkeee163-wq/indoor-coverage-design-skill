@@ -1,113 +1,46 @@
 ---
 name: indoor-coverage-design
-description: Design an indoor cellular signal-booster (DAS) coverage plan from a floor plan — areas, ceiling antennas, booster/IDF placement, coupler/splitter cabling, per-antenna link budget, drawings and bill of materials in Chinese and English. Use when the user gives a building/factory floor plan or area and asks for a signal coverage / booster installation design, 信号覆盖方案, 室分方案, or 主机/天线/耦合器/功分器 layout.
+description: "室内蜂窝信号覆盖与直放站室分方案设计。用户说做覆盖方案、帮我做覆盖方案、信号覆盖方案、室内覆盖、室分方案，或要求设计直放站、信号放大器、天线、耦合器、功分器的布置与走线时调用。即使尚未提供平面图，也先进入资料收集。 Designs indoor cellular booster / DAS coverage plans, link budgets, drawings, and bills of materials."
 ---
 
-# Indoor signal-booster coverage design
+# 室内蜂窝信号覆盖设计
 
-You design a passive indoor distribution system for a cellular signal booster: one or more boosters,
-each with **one** output cable that is split by couplers / splitters into ceiling antennas, plus a
-donor antenna on the roof. The deliverable is a set of drawings (Chinese + English), a per-antenna
-link-budget table and a bill of materials.
+根据平面图设计吸顶或板状天线、主机、无源配件与馈线，给出天线口功率、施工示意和材料用量。用用户当前语言沟通，对外图按交付语言出图。
 
-Speak to the user in the language they use (often Chinese). **Everything that goes to the end
-client is produced in English as well** (the client may be foreign) — the tool renders both.
+先读本页[补充规则（2026-11-24）](#补充规则2026-11-24)、[设计规则](references/design-rules.md)，并按项目地区读取[地区产品与线材约定](references/regional-equipment.md)。[设备参考值](config/equipment.yaml)不能直接代表项目实际设备。遇到多楼层、理论覆盖取舍或共用馈线统计，参考 [多楼层覆盖设计与核算](references/multi-floor-design.md)。使用计算脚本前读 [数据格式](references/design-file-format.md)。需要实例对照时，查阅雅典酒店的[吸顶天线复盘](references/reviewed-case-athens.md)或[板状天线改版复盘](references/reviewed-case-athens-panels.md)。
 
-Read before starting:
-- `references/design-rules.md` — the rules. Every rule there is a correction a senior engineer made
-  during a real project. Treat them as hard requirements.
-- `references/design-file-format.md` — how to write `design.json`.
-- `config/equipment.yaml` — equipment and limits (cable loss, booster powers, coupler / splitter losses,
-  antenna output window). If the user mentions different equipment, edit this file first.
+## 补充规则（2026-11-24）
 
-Tool (Python 3.9+, `pip install -r requirements.txt`):
+以下五条是用户在原有 Skill 基础上新增的设计要求，属于**补充**，不替换原有适用内容。涉及面积、布点、机位、配件、选型及线材时，按本补充执行；其余沿用原规则。已确认的项目条件继续有效。
 
+1. **读懂面积与重点覆盖区，面积不清先问。** 先核实各层/各区的覆盖面积、重点和必覆盖区域，以及影响天线、主机和走线的尺寸、墙体、层高、井道、电源和室外信号。面积可从有尺寸或可靠比例的图纸推算，并注明依据；资料不足时先问用户，答复前只整理已知资料，不布点、不选主机、不自行假设面积。不得用住户数量、“欧洲常规住宅面积”或只有宽度没有进深的数据补出面积，也不能以“有条件初稿”绕过询问。
+2. **面积在前，天线数量与排布在后。** 确定或有依据地推算大概面积后，结合客户覆盖要求、天线覆盖能力、朝向及障碍物安排数量和位置。间距尽量相似、排布均匀整齐；户数仅辅助理解分区，不能直接按一户一支确定数量。板状天线核对前向距离、侧向偏离和背面接线，整齐不能牺牲必覆盖区域。
+3. **先定机位和线材，再定配件/走线，最后选主机功率。** 明确主机安装位置后，根据实际机位安排库存可用的功分器、耦合器和最短可行走线，减少线长、折返、交叉及线损，不先选功率再为它绕线。配件放在真正分岔处，接线方向与来线和天线背面相配合。只有主机已确定、其他天线输出都合适而单支过强时，才可提出加长该支线降功率；先说明增加长度、损耗与输出变化，**取得用户确认后再实施**，不能自动加绕线或藏入余量。
+4. **按用户实际产品选功率，并交代所需频段。** 找回用户已给的地区型号、可用功率档、频段组合和功率统计口径，不用参考库存代替实际库存，不重复索取已有资料。欧洲项目需结合实测室外信号与覆盖业务核对频段；需求或报告提到特定频段时，功率推荐同时说明所需频段并匹配真实产品组合。区分整机总输出、每频段及每载波输出，不未经确认按频段等分总功率。分别验算一台及必要的分区方案，分区主机可用不同功率，不照搬本案例的台数和天线数量。
+5. **布线与线损核算前先区分地区线材。** 本用户欧洲方案用 **5D**，美洲方案用 **LMR400**。这是本用户的项目约定，不是各地区的行业统一标准。按具体型号及目标频率的实际衰减核算，二者线损不能混用；缺少影响计算的参数时先问，不自行换成 LMR600、7/8 英寸等其他线材。详见[地区产品与线材约定](references/regional-equipment.md)。
+
+## 设计顺序
+
+1. **核图与定范围。** 按图上尺寸校准每层并对齐共同结构，确认圈选与房间用途、必覆盖区、可接受边缘信号区、已指定机位及本阶段需要的数据。涉及不确定现场条件且会改变本阶段结论时，集中提问。
+2. **先定天线。** 记录各区是否需要本层直覆盖，或是否可接受边缘补充。按图尺量距后决定增减。吸顶天线以开敞区约 300 m²、10 m 半径为初排参考，检查覆盖圆并集。板状天线按挂墙位置和朝向量前向距离与侧向偏离。比较候选点位时，遵循用户选择的理论或障碍物评估口径，并标出调整后的缺口。遇到上下层互补覆盖，先请用户确认是否采用、涉及哪些楼层和区域，以及预期信号用途。确认后再对齐投影、检查补充机会，或据此调整点位。等待确认时，可先核图和推进各层独立覆盖。把已确认点位用于后续布线。
+3. **再定走线和主机功率。** 从用户指定或可用机位出线，分岔处功分。允许时直接横竖走线，过层高度作为共享物理段。逐路列出完整线长、线损、器件损耗、总损耗及天线口功率。默认按未舍入值严格检查 0 < P < 8 dBm。优先验算一台主机，按用户指定档验算，或选项目可用档中最低合格的档位。支路接近限值时，提醒用户并给出一个经复算的替代参考方案。
+4. **需要时再定频段、型号和增益。** 用户只要求功率档时，按批准的计算口径验算全部支路。需做频段或增益设计时，核对目标业务、实测施主载波、逐载波可用输出和隔离度。施主端输入与目标输出应使用同一功率与带宽口径，RSRP 或 SS-RSRP 用于覆盖评估。设备与频段取值优先用用户提供的项目资料，其次用合适的技能默认值。缺项会影响结论时说明所需数据，遵守用户指定的来源范围。
+5. **出图和材料汇总。** 明细图画清天线、配件和路由，跨层线末端标目标楼层。独立分布图按要求用浅色区分楼层，以图形表现器件，室外对数周期天线用纯绿实心三角。用唯一物理段统计室内与施主馈线，分别报告净用量与备料。导出后检查全图和局部的可读性。
+
+以用户要求的阶段为交付边界。需要用户选择的范围、点位、走线或设备决策，在相关阶段确认。已有明确授权和确认时按设计顺序继续。条件变化时重做受影响的步骤，并让图、表和材料数量引用同一版数据。
+
+## 计算工具
+
+```text
+python scripts/coverage.py areas    DESIGN.json
+python scripts/coverage.py layout   DESIGN.json
+python scripts/coverage.py optimize DESIGN.json --config EQUIPMENT.yaml --powers POWER_LIST
+python scripts/coverage.py check    DESIGN.json --config EQUIPMENT.yaml --lang zh
+python scripts/coverage.py report   DESIGN.json --config EQUIPMENT.yaml
 ```
-python scripts/coverage.py areas    DESIGN.json            # step 0 image: areas with m and ft
-python scripts/coverage.py layout   DESIGN.json            # step 1 image: antennas + coverage circles
-python scripts/coverage.py optimize DESIGN.json            # pick coupler values (writes back into DESIGN.json)
-python scripts/coverage.py check    DESIGN.json --lang zh  # per-antenna budget + design-rule lint
-python scripts/coverage.py report   DESIGN.json            # final drawings, CSVs, BOM, report in zh/ and en/
-```
 
-Worked example: `examples/demo-factory/` (fictional). Copy its structure for a new project.
+`POWER_LIST` 用项目可用的逗号分隔功率档替换。将已确认的地区线材、逐频段线损与可用功率放进项目独立 YAML，通过 `--config` 加载；欧洲项目不得直接使用默认美洲参考配置。优化器在搜索到的可行配件配置中优先使用较低功率。用 `check` 核验每路输出和走线提示。
 
-## Workflow — stop for the user's confirmation after every step
+使用本机可用的 Python 3.9+ 和实际技能目录，依赖见 `requirements.txt`；若环境使用独立解释器或依赖目录，显式指定相应路径。项目资料及生成输出放在用户工作区，设备参数通过项目专用 `--config` 加载，不修改技能参考配置代替项目记录。
 
-Do one step, show the result (image + short table), ask "确认 / 要调整哪里？", and only continue
-when the user confirms. If anything is unclear, ask **before** doing the step. Large sites are done
-**area by area**: design one area, get it confirmed, then the next.
-
-### Step 0 — Intake and areas
-1. Collect (ask for anything missing, in one message):
-   - floor plan (PDF/PNG) and one known dimension to set the scale (`m_per_px`);
-   - priority areas (e.g. circled in red) — everything else still needs coverage;
-   - direction / distance of the base station (sets donor-antenna facing);
-   - IDF / telecom rooms (often red squares on drawings), ceiling height (riser length),
-     areas that need no antennas (electrical rooms, storage);
-   - any changes to equipment (`config/equipment.yaml`).
-2. Convert the plan to PNG (e.g. `pdftoppm -r 150 -png`), set up `project/`, `idf`, and divide the
-   building **along walls** into rectangles in `areas`.
-3. Run `areas`; show the image with each area's size in **m and ft** and area in m² and ft².
-
-### Step 1 — Antennas (count, position, type)
-- Default to **ceiling antennas only** for commercial / professionally installed jobs.
-- Rule of thumb: ~300 m² or R ≈ 10 m each, 3–5 m through a wall (config `ceiling_antenna`).
-- Keep the count reasonable — too many makes boosters hard to fit and raises the client's price
-  expectations. Open/empty spaces get **edge coverage**, not full coverage; circles should not spill
-  far outside exterior walls. Small rooms / storage can be covered by neighbours' edge antennas.
-- Spread antennas evenly; leave room so cables to neighbouring antennas don't crowd together.
-- Write `antennas` (id, pos, area), run `layout`, show counts per area. Expect the user to move,
-  merge or delete antennas; apply and re-render until confirmed.
-
-### Step 2 — Booster positions, routing, couplers / splitters, losses
-For each area (or merged group of areas):
-1. **Booster position** (see rules §2): IDF first; if no IDF nearby or the IDF is so far that an
-   antenna would fall below 0 dBm, mount on a wall near the load. Never in the middle of a room
-   without an IDF there. The donor antenna does **not** decide booster position.
-2. **Booster count**: as few as possible; share a booster with a neighbouring small area instead of
-   adding one. One booster per ~6–13 antennas is typical with 27 dBm.
-3. **Routing tree**: one cable leaves the booster; split only where cables actually diverge.
-   Splitter for branches of similar length; coupler when one branch is much longer (far side gets the
-   through port). Couplers directly feeding an antenna are aligned with it. No duplicated / parallel /
-   back-tracking runs. Build the tree in `boosters[].tree` (see format doc).
-4. Run `optimize` (picks 5/8/10 dB values) then `check`. Fix every ERROR. Treat every WARN as
-   something the user will spot — fix it or explain it.
-5. Show the area drawing (`report` renders views) **and** the per-antenna table: cable length,
-   cable loss, device loss, output (dBm). All antennas must be within the configured window
-   (default 0–8 dBm).
-6. After **any** change (moved booster, new route, swapped device) re-run `optimize`/`check` and show
-   the new per-antenna outputs — the user expects this every time.
-
-Booster power: choose from the configured list (default 27/17/15/12 dBm single port). Prefer the
-lowest power that keeps every antenna ≥ 0 dBm, but the user may also ask to merge two small boosters
-into one bigger one. `optimize --powers 27,17,15,12` tries several.
-
-### Step 3 — Margins and booster gain (only when the user asks to continue)
-From the original method: add margins (end 2–3 dB + antenna 4–6 dB = 8–10 dB), then derive required
-booster gain from outdoor signal (RSRP at the donor), donor cable loss and target antenna output.
-You need from the user: outdoor RSRP, their gain formula, and the model list. **Ask; don't invent.**
-
-### Step 4 — Final deliverables
-1. `report` → `output/zh/` and `output/en/`:
-   overview, one drawing per view, areas map, per-antenna CSV, bill of materials CSV, report.md.
-2. Check the images yourself (open them): labels readable, no lines on top of each other, legend
-   quantities right, every booster/donor labelled. English version must contain **no Chinese**.
-3. BOM: boosters by power, couplers by dB, splitters by ratio, ceiling + donor antennas, cable split
-   into indoor / donor / total / order quantity (+15 %), in m and ft, N connectors, plus per-booster
-   breakdown and the assumptions (riser, slack, ceiling height to confirm on site).
-4. Deliver both language folders. Summarise in chat: boosters, antennas, output range, cable total.
-
-## Conventions the drawings must follow
-See `references/design-rules.md` §5. In short: booster = coloured box (colour by power, 27 red,
-17 gold), donor = green triangle "N↑" with dashed line, antenna = purple dot, LMR400 = orange line;
-coupler = bar on the input side + short stub toward the coupled port ("──┘"), colour by dB
-(5 green, 8 blue, 10 black); splitter = rectangle, single input on one long side and parallel
-outputs on the opposite long side, colour by ratio (1:2 light blue, 1:3 yellow, 1:4 pink); legend
-shows the quantity of each device.
-
-## When the tool is not enough
-The JSON + CLI cover the standard cases. For an unusual layout you may edit drawings by hand or extend
-`scripts/covtool/`, but keep the link-budget math identical:
-`output = booster − device losses − length × loss/100 m`, length = right-angle routing + riser +
-slack per antenna.
+示例 `examples/demo-factory/` 为虚构单层工程。默认绘图与领料汇总面向单层平面。多层项目分层出图，可用等效长度树做逐路验算，并用同一套物理段清单统计线缆。

@@ -39,6 +39,8 @@ See `examples/demo-factory/design.json` for a complete file.
 }
 ```
 
+The stock renderer and BOM use one flat plan. For separate floor plans, keep display offsets for alignment only and model vertical cable as a physical length on the shared trunk. Use the same unique-segment ledger for cable takeoff.
+
 ## Nodes
 
 ```jsonc

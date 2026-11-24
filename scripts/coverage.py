@@ -39,7 +39,7 @@ def print_table(d, cfg, res, lang):
         print("  " + " | ".join(t["cols"]))
         for r in sorted(res[b["id"]], key=lambda r: (len(r["antenna"]), r["antenna"])):
             print(f"  {r['antenna']:<7} {r['length_m']:5.0f} m  {r['cable_db']:5.1f} dB  {r['device_db']:5.1f} dB  "
-                  f"{r['total_db']:5.1f} dB  {r['out_dbm']:5.1f} dBm   {path_str(r['path'], lang)}")
+                  f"{r['total_db']:5.1f} dB  {r['out_dbm']:5.2f} dBm   {path_str(r['path'], lang)}")
 
 
 def main():
@@ -64,18 +64,23 @@ def main():
 
     if args.cmd == "optimize":
         powers = [int(x) for x in args.powers.split(",")] if args.powers else None
+        failed = False
         for b in d["boosters"]:
             if args.booster and b["id"] != args.booster:
                 continue
             best = engine.optimise_booster(b, d, cfg, powers)
             if best is None:
-                print(f"Booster {b['id']}: NO coupler combination keeps every antenna <= {cfg['antenna_output']['max_dbm']} dBm "
-                      "→ add cable/loss near the booster, move the booster, or use a lower power")
+                limits = cfg["antenna_output"]
+                print(f"Booster {b['id']}: no candidate found within strict range "
+                      f"{limits['min_dbm']} < P < {limits['max_dbm']} dBm for every antenna")
+                failed = True
                 continue
             sc, P, vals = best
             b["power_dbm"] = P; engine.apply_values(b, vals)
             ps = [r["out_dbm"] for r in engine.evaluate_booster(b, d, cfg)]
             print(f"Booster {b['id']}: {P} dBm, couplers {vals} → {min(ps):.1f} ~ {max(ps):.1f} dBm")
+        if failed:
+            sys.exit(1)
         engine.save_design(d)
         print("saved", d["_path"])
         return

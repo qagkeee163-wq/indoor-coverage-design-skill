@@ -1,5 +1,7 @@
 # Equipment & design parameters / 设备与设计参数
-# Edit this file when your product line changes. 换设备时只改这里。
+# 补充（2026-11-24）：本文件保留参考数值；地区选型约定见 references/regional-equipment.md。
+# Americas reference only. Confirm region first; use a project-specific --config.
+# Europe uses user-specified 5D and the actual European product table; never use this file unchanged for Europe.
 
 cable:
   name: LMR400
@@ -11,11 +13,12 @@ cable:
   connectors_per_segment: 2     # N-type connectors per cable segment
 
 antenna_output:
-  min_dbm: 0.0                  # every indoor antenna must be >= this
-  max_dbm: 8.0                  # and <= this (checked after rounding to 0.1)
+  min_dbm: 0.0                  # exclusive, tested on unrounded results
+  max_dbm: 8.0                  # exclusive, tested on unrounded results
 
-# Allowed booster output powers (single output port). 可用主机（单口）
-# 23 dBm is NOT available. "xN" models (e.g. 14x2) are NOT dual-port: they have a
+# Americas REFERENCE booster powers only; actual user inventory overrides.
+# 美洲参考档，不是通用库存；欧洲必须用用户给过的欧版型号和功率。
+# Project-specific model lists can include other powers. "xN" models (e.g. 14x2) have a
 # built-in 2-way splitter, ~+3 dB total, and still only ONE output port.
 boosters:
   - {power_dbm: 27, color: [185, 25, 40]}    # red
@@ -52,7 +55,7 @@ optimizer:           # score = min - w_spread*(max-min) - w_mad*MAD
   brute_force_max_couplers: 11   # above this, coordinate descent is used
 
 colors:
-  cable: [235, 120, 30]          # orange LMR400
+  cable: [235, 120, 30]          # orange feeder
   antenna: [120, 40, 200]        # purple dot
   donor: [40, 170, 40]           # green triangle, points north
   area: [30, 100, 200]

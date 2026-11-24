@@ -121,8 +121,8 @@ def render_layout(d, cfg, lang, out):
     for a in d.get("antennas", []):
         X, Y = cv.P(a["pos"])
         cv.d.ellipse([X - R, Y - R, X + R, Y + R], outline=pu + (255,), width=2)
-        cv.d.ellipse([X - 14, Y - 14, X + 14, Y + 14], fill=pu, outline="white", width=3)
-        cv.label((X + 16, Y - 34), a["id"], 22, pu)
+        cv.d.ellipse([X - 18, Y - 18, X + 18, Y + 18], fill=pu, outline="white", width=4)
+        cv.label((X + 22, Y - 34), a["id"], 22, pu)
     x, y = cv.base_w + 40, 40
     cv.d.text((x, y), t["layout_title"].format(r=cfg["ceiling_antenna"]["radius_m"]), font=cv.f(40), fill="black"); y += 80
     cnt = Counter(a.get("area", "?") for a in d.get("antennas", []))
