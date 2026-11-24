@@ -4,8 +4,11 @@ from collections import Counter
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .engine import antenna_index, branches, node_pos, device_counts
-from .i18n import T, txt, path_str
+import math
+
+from . import geom
+from .engine import antenna_index, branches, node_floors, bands, ref_band
+from .i18n import T, txt, path_str, loss_str
 from .lint import expand
 
 FT = 3.28084
@@ -32,8 +35,11 @@ def C(c):
 
 
 class Canvas:
-    def __init__(self, d, cfg, crop=None, width=2400, panel=1700, fade=110):
-        img = Image.open(os.path.join(d["_dir"], d["project"]["floorplan"])).convert("RGBA")
+    def __init__(self, d, cfg, crop=None, width=2400, panel=1700, fade=110, floor=None):
+        self.floor = floor or geom.default_floor(d)
+        fl = geom.floors(d)[self.floor]
+        self.k = float(fl["m_per_px"])
+        img = Image.open(os.path.join(d["_dir"], fl["floorplan"])).convert("RGBA")
         crop = crop or [0, 0, img.width, img.height]
         img = img.crop(crop)
         self.z = width / img.width
@@ -74,67 +80,27 @@ class Canvas:
         return out
 
 
-# ---------------------------------------------------------------- step 0 / 1
-def draw_areas(cv, d, lang, show_size=True):
-    cfg = cv.cfg; k = d["project"]["m_per_px"]; col = C(cfg["colors"]["area"])
-    for a in d.get("areas", []):
-        x0, y0, x1, y1 = a["rect"]
-        p0, p1 = cv.P((x0, y0)), cv.P((x1, y1))
-        cv.d.rectangle([p0, p1], outline=col, width=5)
-        w, h = abs(x1 - x0) * k, abs(y1 - y0) * k
-        lab = txt(a.get("name", a["id"]), lang)
-        cv.label((p0[0] + 8, p0[1] + 8), lab, 34, col)
-        if show_size:
-            cv.label((p0[0] + 8, p0[1] + 52), f"{w:.0f}×{h:.0f} m / {w*FT:.0f}×{h*FT:.0f} ft", 24, col)
-            cv.label((p0[0] + 8, p0[1] + 82), f"{w*h:,.0f} m² / {w*h*FT*FT:,.0f} ft²", 24, col)
+# ---------------------------------------------------------------- helpers
+def floor_name(d, f, lang):
+    fl = geom.floors(d).get(f, {})
+    return txt(fl.get("name", f), lang) or f
+
+
+def on_floor(obj, d, floor):
+    return geom.obj_floor(obj, d) == floor
+
+
+def idf_points(d, floor):
+    out = []
     for p in d.get("idf", []):
-        X, Y = cv.P(p)
-        cv.d.rectangle([X - 12, Y - 12, X + 12, Y + 12], fill=C(cfg["colors"]["idf"]), outline="black", width=2)
-        cv.label((X + 16, Y - 14), T[lang]["idf"], 22, C(cfg["colors"]["idf"]))
+        if isinstance(p, dict):
+            if (p.get("floor") or geom.default_floor(d)) == floor:
+                out.append(p["pos"])
+        elif floor == geom.default_floor(d):
+            out.append(p)
+    return out
 
 
-def render_areas(d, cfg, lang, out):
-    t = T[lang]; cv = Canvas(d, cfg); k = d["project"]["m_per_px"]
-    draw_areas(cv, d, lang)
-    x, y = cv.base_w + 40, 40
-    cv.d.text((x, y), f"{txt(d['project']['name'], lang)} – {t['areas_title']}", font=cv.f(42), fill="black"); y += 90
-    cols = [x, x + 260, x + 560, x + 860, x + 1110]
-    for c, h in zip(cols, t["area_tbl"]):
-        cv.d.text((c, y), h, font=cv.f(28), fill="black")
-    y += 48; tot = 0
-    for a in d.get("areas", []):
-        x0, y0, x1, y1 = a["rect"]; w, h = abs(x1 - x0) * k, abs(y1 - y0) * k; tot += w * h
-        for c, v in zip(cols, [txt(a.get("name", a["id"]), lang), f"{w:.0f} × {h:.0f}", f"{w*FT:.0f} × {h*FT:.0f}",
-                               f"{w*h:,.0f}", f"{w*h*FT*FT:,.0f}"]):
-            cv.d.text((c, y), v, font=cv.f(26), fill="black")
-        y += 42
-    cv.d.text((x, y + 10), f"{t['total']}: {tot:,.0f} m² / {tot*FT*FT:,.0f} ft²", font=cv.f(30), fill="black")
-    cv.grow(y + 80)
-    return cv.save(out)
-
-
-def render_layout(d, cfg, lang, out):
-    t = T[lang]; cv = Canvas(d, cfg); k = d["project"]["m_per_px"]
-    draw_areas(cv, d, lang, show_size=False)
-    R = cfg["ceiling_antenna"]["radius_m"] / k * cv.z
-    pu = C(cfg["colors"]["antenna"])
-    for a in d.get("antennas", []):
-        X, Y = cv.P(a["pos"])
-        cv.d.ellipse([X - R, Y - R, X + R, Y + R], outline=pu + (255,), width=2)
-        cv.d.ellipse([X - 18, Y - 18, X + 18, Y + 18], fill=pu, outline="white", width=4)
-        cv.label((X + 22, Y - 34), a["id"], 22, pu)
-    x, y = cv.base_w + 40, 40
-    cv.d.text((x, y), t["layout_title"].format(r=cfg["ceiling_antenna"]["radius_m"]), font=cv.f(40), fill="black"); y += 80
-    cnt = Counter(a.get("area", "?") for a in d.get("antennas", []))
-    names = {a["id"]: txt(a.get("name", a["id"]), lang) for a in d.get("areas", [])}
-    for aid in [a["id"] for a in d.get("areas", [])] + [a for a in cnt if a not in names]:
-        cv.d.text((x, y), f"{names.get(aid, aid)}:  {cnt.get(aid, 0)}", font=cv.f(28), fill="black"); y += 44
-    cv.d.text((x, y + 10), f"{t['total']}: " + t["ant_count"].format(n=len(d.get("antennas", []))), font=cv.f(30), fill="black")
-    cv.grow(y + 80)
-    return cv.save(out)
-
-
-# ---------------------------------------------------------------- step 2 plans
 def _dir(pts):
     q = expand(pts)
     for a, b in zip(q, q[1:]):
@@ -145,56 +111,179 @@ def _dir(pts):
 
 
 def booster_color(cfg, P):
-    for b in cfg["boosters"]:
+    for b in cfg.get("boosters") or []:
         if b["power_dbm"] == P:
             return C(b["color"])
-    return (185, 25, 40)
+    pal = [(185, 25, 40), (184, 134, 11), (0, 128, 128), (90, 90, 90), (120, 60, 160)]
+    return pal[int(P) % len(pal)]
 
 
-def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True):
-    cfg = cv.cfg; t = T[lang]; ants = antenna_index(d)
+def aim_unit(deg):
+    r = math.radians(float(deg))
+    return (math.sin(r), -math.cos(r))          # 0° = up (north), 90° = right (east)
+
+
+def panel_symbol(cv, X, Y, deg, color, arrow=True):
+    ux, uy = aim_unit(deg); px, py = -uy, ux     # perpendicular = wall direction
+    L, T2 = 30, 11
+    pts = [(X + px * L - ux * T2, Y + py * L - uy * T2), (X - px * L - ux * T2, Y - py * L - uy * T2),
+           (X - px * L + ux * T2, Y - py * L + uy * T2), (X + px * L + ux * T2, Y + py * L + uy * T2)]
+    cv.d.polygon(pts, fill=color, outline="white")
+    if arrow:
+        tip = (X + ux * 62, Y + uy * 62)
+        cv.d.line([(X + ux * T2, Y + uy * T2), tip], fill=color, width=5)
+        cv.d.polygon([tip, (tip[0] - ux * 16 + px * 9, tip[1] - uy * 16 + py * 9),
+                      (tip[0] - ux * 16 - px * 9, tip[1] - uy * 16 - py * 9)], fill=color)
+
+
+def panel_footprint(cv, a, cfg, k):
+    rng = float(a.get("range_m") or cfg["panel_antenna_range_m"][1]) / k * cv.z
+    hw = float(a.get("half_width_m") or cfg.get("panel_half_width_m", 5)) / k * cv.z
+    X, Y = cv.P(a["pos"]); ux, uy = aim_unit(a.get("aim_deg", 0)); px, py = -uy, ux
+    return [(X + px * hw, Y + py * hw), (X - px * hw, Y - py * hw),
+            (X - px * hw + ux * rng, Y - py * hw + uy * rng), (X + px * hw + ux * rng, Y + py * hw + uy * rng)]
+
+
+# ---------------------------------------------------------------- step 0 / 1
+def draw_areas(cv, d, lang, show_size=True):
+    cfg = cv.cfg; k = cv.k; col = C(cfg["colors"]["area"])
+    for a in d.get("areas", []):
+        if not on_floor(a, d, cv.floor):
+            continue
+        x0, y0, x1, y1 = a["rect"]
+        p0, p1 = cv.P((x0, y0)), cv.P((x1, y1))
+        cv.d.rectangle([p0, p1], outline=col, width=5)
+        w, h = abs(x1 - x0) * k, abs(y1 - y0) * k
+        cv.label((p0[0] + 8, p0[1] + 8), txt(a.get("name", a["id"]), lang), 34, col)
+        if show_size:
+            cv.label((p0[0] + 8, p0[1] + 52), f"{w:.0f}×{h:.0f} m / {w*FT:.0f}×{h*FT:.0f} ft", 24, col)
+            cv.label((p0[0] + 8, p0[1] + 82), f"{w*h:,.0f} m² / {w*h*FT*FT:,.0f} ft²", 24, col)
+    for p in idf_points(d, cv.floor):
+        X, Y = cv.P(p)
+        cv.d.rectangle([X - 12, Y - 12, X + 12, Y + 12], fill=C(cfg["colors"]["idf"]), outline="black", width=2)
+        cv.label((X + 16, Y - 14), T[lang]["idf"], 22, C(cfg["colors"]["idf"]))
+
+
+def _title(d, lang, floor, what):
+    fn = floor_name(d, floor, lang) if d.get("floors") else ""
+    return f"{txt(d['project']['name'], lang)}{(' · ' + fn) if fn else ''} – {what}"
+
+
+def render_areas(d, cfg, lang, out, floor=None):
+    t = T[lang]; cv = Canvas(d, cfg, floor=floor); k = cv.k
+    draw_areas(cv, d, lang)
+    x, y = cv.base_w + 40, 40
+    cv.d.text((x, y), _title(d, lang, cv.floor, t["areas_title"]), font=cv.f(42), fill="black"); y += 90
+    cols = [x, x + 260, x + 560, x + 860, x + 1110]
+    for c, h in zip(cols, t["area_tbl"]):
+        cv.d.text((c, y), h, font=cv.f(28), fill="black")
+    y += 48; tot = 0
+    for a in d.get("areas", []):
+        if not on_floor(a, d, cv.floor):
+            continue
+        x0, y0, x1, y1 = a["rect"]; w, h = abs(x1 - x0) * k, abs(y1 - y0) * k; tot += w * h
+        for c, v in zip(cols, [txt(a.get("name", a["id"]), lang), f"{w:.0f} × {h:.0f}", f"{w*FT:.0f} × {h*FT:.0f}",
+                               f"{w*h:,.0f}", f"{w*h*FT*FT:,.0f}"]):
+            cv.d.text((c, y), v, font=cv.f(26), fill="black")
+        y += 42
+    cv.d.text((x, y + 10), f"{t['total']}: {tot:,.0f} m² / {tot*FT*FT:,.0f} ft²", font=cv.f(30), fill="black")
+    cv.grow(y + 80)
+    return cv.save(out)
+
+
+def render_layout(d, cfg, lang, out, floor=None):
+    t = T[lang]; cv = Canvas(d, cfg, floor=floor); k = cv.k
+    draw_areas(cv, d, lang, show_size=False)
+    R = cfg["ceiling_antenna"]["radius_m"] / k * cv.z
+    pu = C(cfg["colors"]["antenna"])
+    mine = [a for a in d.get("antennas", []) if on_floor(a, d, cv.floor)]
+    for a in mine:
+        X, Y = cv.P(a["pos"])
+        if a.get("type") == "panel":
+            cv.d.polygon(panel_footprint(cv, a, cfg, k), outline=pu)
+            panel_symbol(cv, X, Y, a.get("aim_deg", 0), pu)
+        else:
+            cv.d.ellipse([X - R, Y - R, X + R, Y + R], outline=pu + (255,), width=2)
+            cv.d.ellipse([X - 18, Y - 18, X + 18, Y + 18], fill=pu, outline="white", width=4)
+        cv.label((X + 22, Y - 40), a["id"], 22, pu)
+    x, y = cv.base_w + 40, 40
+    cv.d.text((x, y), _title(d, lang, cv.floor, t["layout_title"].format(r=cfg["ceiling_antenna"]["radius_m"])),
+              font=cv.f(36), fill="black"); y += 80
+    cnt = Counter(a.get("area", "?") for a in mine)
+    names = {a["id"]: txt(a.get("name", a["id"]), lang) for a in d.get("areas", []) if on_floor(a, d, cv.floor)}
+    for aid in list(names) + [a for a in cnt if a not in names]:
+        cv.d.text((x, y), f"{names.get(aid, aid)}:  {cnt.get(aid, 0)}", font=cv.f(28), fill="black"); y += 44
+    cv.d.text((x, y + 10), f"{t['total']}: " + t["ant_count"].format(n=len(mine)), font=cv.f(30), fill="black")
+    cv.grow(y + 80)
+    return cv.save(out)
+
+
+# ---------------------------------------------------------------- plans
+def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True, panel_arrows=True):
+    cfg = cv.cfg; t = T[lang]; ants = antenna_index(d); FL = cv.floor
     OR = C(cfg["colors"]["cable"]); W = 8
     cnt = Counter()
     devs = []
 
     def poly(pts):
-        cv.d.line([cv.P(p) for p in expand(pts)], fill=OR, width=W, joint="curve")
+        if len(pts) > 1:
+            cv.d.line([cv.P(p) for p in expand(pts)], fill=OR, width=W, joint="curve")
 
-    def walk(n, inpath):
-        if n["type"] == "antenna":
-            return
-        devs.append((n, inpath))
-        if n["type"] == "splitter":
-            draw_splitter_outputs(n)
-        for _, br in branches(n):
-            if n["type"] != "splitter":
-                poly(br["path"])
-            walk(br["node"], br["path"])
+    def rise_marks(rises):
+        for r in rises:
+            if r["from_floor"] == FL:
+                X, Y = cv.P(r["at_from"])
+                cv.d.ellipse([X - 12, Y - 12, X + 12, Y + 12], fill="white", outline=OR, width=5)
+                cv.label((X + 16, Y + 6), t["to_floor"].format(f=floor_name(d, r["to_floor"], lang)), 26, OR)
+            if r["to_floor"] == FL:
+                X, Y = cv.P(r["at_to"])
+                cv.d.ellipse([X - 12, Y - 12, X + 12, Y + 12], fill=OR, outline="white", width=3)
+                cv.label((X + 16, Y + 6), t["from_floor"].format(f=floor_name(d, r["from_floor"], lang)), 26, OR)
 
-    def draw_splitter_outputs(n):
+    def draw_branch(path, start_floor, splitter=None, lane=0):
+        pieces, rises, end = geom.split_path(path, start_floor, d)
+        for i, (f, pts) in enumerate(pieces):
+            if f != FL:
+                continue
+            if splitter is not None and i == 0 and len(pts) >= 2:
+                splitter_lane(splitter, pts, lane)
+            else:
+                poly(pts)
+        rise_marks(rises)
+        return end
+
+    def splitter_lane(n, pts, i):
         """Outputs leave the far long side as parallel short lines, then follow their paths."""
         od = _dir(n["outputs"][0]["path"]); w = len(n["outputs"])
         X, Y = cv.P(n["pos"]); Lb, Tb = 34, 12
-        perp = (od[1] != 0, od[0] != 0)            # axis along the long side
-        for i, br in enumerate(n["outputs"]):
-            off = (-Lb * 0.6 + 1.2 * Lb * i / (w - 1)) if w > 1 else 0
-            s0 = (X + od[0] * Tb + perp[0] * off, Y + od[1] * Tb + perp[1] * off)
-            pts = [cv.P(p) for p in expand(br["path"])]
-            if len(pts) < 2:
-                continue
-            p1 = pts[1]
-            lane = (p1[0], s0[1]) if od[1] == 0 else (s0[0], p1[1])
-            line = [s0, lane] + (pts[2:] if len(pts) > 2 else [p1])
-            cv.d.line(line, fill=OR, width=W, joint="curve")
+        perp = (od[1] != 0, od[0] != 0)
+        off = (-Lb * 0.6 + 1.2 * Lb * i / (w - 1)) if w > 1 else 0
+        s0 = (X + od[0] * Tb + perp[0] * off, Y + od[1] * Tb + perp[1] * off)
+        q = [cv.P(p) for p in expand(pts)]
+        p1 = q[1]
+        lane = (p1[0], s0[1]) if od[1] == 0 else (s0[0], p1[1])
+        cv.d.line([s0, lane] + (q[2:] if len(q) > 2 else [p1]), fill=OR, width=W, joint="curve")
 
     for b in boosters:
-        poly(b["feed"]); walk(b["tree"], b["feed"])
-        a, e = cv.P(b["pos"]), cv.P(b["donor"])
-        for i in range(30):  # dashed donor cable
-            t0, t1 = i / 30, (i + .5) / 30
-            cv.d.line([(a[0] + (e[0] - a[0]) * t0, a[1] + (e[1] - a[1]) * t0),
-                       (a[0] + (e[0] - a[0]) * t1, a[1] + (e[1] - a[1]) * t1)], fill=C(cfg["colors"]["donor"]), width=5)
-        cnt += device_counts(b["tree"])
+        nf = node_floors(b, d)
+
+        def walk(n, inpath):
+            if n["type"] == "antenna":
+                return
+            if nf[id(n)] == FL:
+                devs.append((n, inpath))
+                cnt[("coupler", int(n["value"])) if n["type"] == "coupler" else ("splitter", len(n["outputs"]))] += 1
+            for i, (_, br) in enumerate(branches(n)):
+                draw_branch(br["path"], nf[id(n)], n if n["type"] == "splitter" else None, i)
+                walk(br["node"], br["path"])
+        draw_branch(b["feed"], geom.obj_floor(b, d))
+        walk(b["tree"], b["feed"])
+        if on_floor(b, d, FL) and b.get("donor"):
+            a, e = cv.P(b["pos"]), cv.P(b["donor"])
+            for i in range(30):  # dashed donor cable
+                t0, t1 = i / 30, (i + .5) / 30
+                cv.d.line([(a[0] + (e[0] - a[0]) * t0, a[1] + (e[1] - a[1]) * t0),
+                           (a[0] + (e[0] - a[0]) * t1, a[1] + (e[1] - a[1]) * t1)], fill=C(cfg["colors"]["donor"]), width=5)
 
     for n, inpath in devs:
         X, Y = cv.P(n["pos"])
@@ -220,37 +309,51 @@ def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True
     pu = C(cfg["colors"]["antenna"])
     for b in boosters:
         for r in results[b["id"]]:
+            a = ants[r["antenna"]]
+            if not on_floor(a, d, FL):
+                continue
             X, Y = cv.P(r["pos"])
-            cv.d.ellipse([X - 22, Y - 22, X + 22, Y + 22], fill=pu, outline="white", width=4)
+            if a.get("type") == "panel":
+                panel_symbol(cv, X, Y, a.get("aim_deg", 0), pu, arrow=panel_arrows)
+            else:
+                cv.d.ellipse([X - 22, Y - 22, X + 22, Y + 22], fill=pu, outline="white", width=4)
             if ant_labels:
                 cv.label((X + 26, Y - 44), r["antenna"], 28, pu)
+        if not on_floor(b, d, FL):
+            continue
         X, Y = cv.P(b["pos"]); hc = booster_color(cfg, b["power_dbm"])
         cv.d.rectangle([X - 16, Y - 32, X + 16, Y + 32], fill=hc, outline="black", width=3)
-        lab = f"{t['booster']} {b['id']}  {b['power_dbm']}dBm"; fs = 34; tw = cv.d.textlength(lab, font=cv.f(fs))
+        lab = f"{t['booster']} {b['id']}  {b['power_dbm']:g}dBm"; fs = 34; tw = cv.d.textlength(lab, font=cv.f(fs))
         bx = (X - 40 - tw, X - 30) if b.get("label_side", "L") == "L" else (X + 30, X + 40 + tw)
         dy = b.get("label_dy", 0)
         cv.d.rounded_rectangle([bx[0], Y - 24 + dy, bx[1], Y + 24 + dy], 8, fill=hc)
         cv.d.text((bx[0] + 5, Y - 24 + dy), lab, font=cv.f(fs), fill="white")
-        dx, dy2 = cv.P(b["donor"])
-        cv.d.polygon([(dx, dy2 - 44), (dx - 20, dy2 + 4), (dx + 20, dy2 + 4)], fill=C(cfg["colors"]["donor"]), outline="black", width=2)
-        if donor_labels:
-            tt = f"{t['donor']} ({b['id']}) N↑"; tw = cv.d.textlength(tt, font=cv.f(26))
-            tx = dx + 22 if dx < cv.base_w - tw - 40 else dx - 22 - tw
-            cv.label((tx, dy2 - 52), tt, 26, (20, 120, 20))
+        if b.get("donor"):
+            dx, dy2 = cv.P(b["donor"])
+            cv.d.polygon([(dx, dy2 - 44), (dx - 20, dy2 + 4), (dx + 20, dy2 + 4)], fill=C(cfg["colors"]["donor"]))
+            if donor_labels:
+                tt = f"{t['donor']} ({b['id']}) N↑"; tw = cv.d.textlength(tt, font=cv.f(26))
+                tx = dx + 22 if dx < cv.base_w - tw - 40 else dx - 22 - tw
+                cv.label((tx, dy2 - 52), tt, 26, (20, 120, 20))
     return cnt
 
 
-def legend(cv, x, y, boosters, cnt, lang):
+def legend(cv, x, y, boosters, cnt, lang, d, has_panel=False, has_ceiling=True):
     cfg = cv.cfg; t = T[lang]
     for P in sorted({b["power_dbm"] for b in boosters}, reverse=True):
         c = booster_color(cfg, P); cv.d.rectangle([x + 18, y, x + 42, y + 44], fill=c)
-        cv.d.text((x + 80, y), f"{t['booster']} {P} dBm", font=cv.f(30), fill="black"); y += 54
-    cv.d.polygon([(x + 30, y), (x + 12, y + 40), (x + 48, y + 40)], fill=C(cfg["colors"]["donor"]), outline="black")
+        models = sorted({b["model"] for b in boosters if b["power_dbm"] == P and b.get("model")})
+        cv.d.text((x + 80, y), f"{t['booster']} {P:g} dBm" + (f"  ({', '.join(models)})" if models else ""), font=cv.f(30), fill="black"); y += 54
+    cv.d.polygon([(x + 30, y), (x + 12, y + 40), (x + 48, y + 40)], fill=C(cfg["colors"]["donor"]))
     cv.d.text((x + 80, y), t["donor_legend"], font=cv.f(30), fill="black"); y += 54
-    cv.d.ellipse([x + 12, y + 4, x + 48, y + 40], fill=C(cfg["colors"]["antenna"]))
-    cv.d.text((x + 80, y), t["antenna"], font=cv.f(30), fill="black"); y += 54
+    if has_ceiling:
+        cv.d.ellipse([x + 12, y + 4, x + 48, y + 40], fill=C(cfg["colors"]["antenna"]))
+        cv.d.text((x + 80, y), t["antenna"], font=cv.f(30), fill="black"); y += 54
+    if has_panel:
+        panel_symbol(cv, x + 30, y + 26, 0, C(cfg["colors"]["antenna"]), arrow=False)
+        cv.d.text((x + 80, y), t["panel"], font=cv.f(30), fill="black"); y += 54
     cv.d.line([x, y + 22, x + 60, y + 22], fill=C(cfg["colors"]["cable"]), width=8)
-    cv.d.text((x + 80, y), t["cable"].format(name=cfg["cable"]["name"], loss=cfg["cable"]["loss_db_per_100m"]), font=cv.f(30), fill="black"); y += 60
+    cv.d.text((x + 80, y), t["cable"].format(name=cfg["cable"]["name"], loss=loss_str(cfg, bands(d, cfg))), font=cv.f(30), fill="black"); y += 60
     cv.d.text((x, y), t["couplers"], font=cv.f(30), fill="black"); y += 52
     for v, sp in sorted(cfg["couplers"].items()):
         c = C(sp["color"]); cv.d.line([(x + 6, y + 30), (x + 56, y + 30)], fill=c, width=10); cv.d.line([(x + 56, y + 30), (x + 56, y + 10)], fill=c, width=10)
@@ -263,59 +366,82 @@ def legend(cv, x, y, boosters, cnt, lang):
     return y + 16
 
 
-def notes(cv, x, y, lang, extra=()):
+def notes(cv, x, y, lang, d, extra=()):
     cfg = cv.cfg; t = T[lang]; c = cfg["cable"]; a = cfg["antenna_output"]
     for s in [t["note1"].format(lo=a["min_dbm"], hi=a["max_dbm"]),
-              t["note2"].format(loss=c["loss_db_per_100m"], riser=c["riser_m"], slack=c["slack_per_antenna_m"]), *extra]:
+              t["note2"].format(loss=loss_str(cfg, bands(d, cfg)), riser=c["riser_m"], slack=c["slack_per_antenna_m"]), *extra]:
         cv.d.text((x, y), s, font=cv.f(25), fill=(80, 80, 80)); y += 38
     return y
 
 
+def _band_tag(bd):
+    return f"@{bd}" if bd is not None else ""
+
+
 def render_view(d, cfg, lang, view, results, out):
-    t = T[lang]
+    t = T[lang]; ants = antenna_index(d)
     bs = [b for b in d["boosters"] if b["id"] in view["boosters"]]
-    cv = Canvas(d, cfg, crop=view.get("crop"), width=view.get("width", 2400), panel=view.get("panel", 2000))
-    cnt = draw_plan(cv, d, bs, results, lang)
+    floor = view.get("floor") or geom.default_floor(d)
+    cv = Canvas(d, cfg, crop=view.get("crop"), width=view.get("width", 2400), panel=view.get("panel", 2100), floor=floor)
+    cnt = draw_plan(cv, d, bs, results, lang, panel_arrows=view.get("panel_arrows", True))
+    on = [ants[r["antenna"]] for b in bs for r in results[b["id"]] if on_floor(ants[r["antenna"]], d, floor)]
     x, y = cv.base_w + 30, 30
     cv.d.text((x, y), txt(view["title"], lang), font=cv.f(44), fill="black"); y += 80
-    y = legend(cv, x, y, bs, cnt, lang)
-    cols = [x, x + 150, x + 300, x + 470, x + 650, x + 830, x + 1010]
-    for c, h in zip(cols, t["cols"]):
-        cv.d.text((c, y), h, font=cv.f(28), fill="black")
+    y = legend(cv, x, y, bs, cnt, lang, d, has_panel=any(a.get("type") == "panel" for a in on),
+               has_ceiling=any(a.get("type", "ceiling") != "panel" for a in on))
+    bl = bands(d, cfg); rb = ref_band(d, cfg); others = [b for b in bl if b != rb]
+    head = list(t["cols"])
+    if rb is not None:
+        head[2] += f" {_band_tag(rb)}"; head[4] += f" {_band_tag(rb)}"; head[5] += f" {_band_tag(rb)}"
+    cols = [x, x + 140, x + 290, x + 530, x + 710, x + 950, x + 1190]
+    if others:
+        head = head[:6] + [t["other_bands"]] + head[6:]
+        cols = cols[:6] + [x + 1190, x + 1530]
+    for c, h in zip(cols, head):
+        cv.d.text((c, y), h, font=cv.f(26), fill="black")
     y += 46
     for b in bs:
-        cv.d.text((x, y), f"{t['booster']} {b['id']}  ({txt(b.get('location', ''), lang)}, {b['power_dbm']} dBm)", font=cv.f(30), fill=booster_color(cfg, b["power_dbm"])); y += 46
-        for r in sorted(results[b["id"]], key=lambda r: (len(r["antenna"]), r["antenna"])):
-            for c, v in zip(cols, [r["antenna"], f"{r['length_m']:.0f} m", f"{r['cable_db']:.1f} dB", f"{r['device_db']:.1f} dB",
-                                   f"{r['total_db']:.1f} dB", f"{r['out_dbm']:.1f} dBm"]):
-                cv.d.text((c, y), v, font=cv.f(27), fill="black")
-            cv.d.text((cols[6], y + 3), path_str(r["path"], lang), font=cv.f(23), fill=(70, 70, 70)); y += 42
+        loc = txt(b.get("location", ""), lang)
+        mdl = f", {b['model']}" if b.get("model") else ""
+        cv.d.text((x, y), f"{t['booster']} {b['id']}  ({loc}, {b['power_dbm']:g} dBm{mdl})", font=cv.f(30),
+                  fill=booster_color(cfg, b["power_dbm"])); y += 46
+        rows = [r for r in results[b["id"]] if not d.get("floors") or r["floor"] == floor]
+        for r in sorted(rows, key=lambda r: (len(r["antenna"]), r["antenna"])):
+            vals = [r["antenna"], f"{r['length_m']:.1f} m", f"{r['cable_db']:.1f} dB", f"{r['device_db']:.1f} dB",
+                    f"{r['total_db']:.1f} dB", f"{r['out_dbm']:.2f} dBm"]
+            if others:
+                vals.append("  ".join(f"{bd}: {r['by_band'][bd]['out_dbm']:.2f}" for bd in others))
+            for c, v in zip(cols, vals):
+                cv.d.text((c, y), v, font=cv.f(26), fill="black")
+            cv.d.text((cols[-1], y + 3), path_str(r["path"], lang), font=cv.f(22), fill=(70, 70, 70)); y += 42
         y += 16
-    y = notes(cv, x, y + 10, lang, [txt(n, lang) for n in view.get("notes", [])])
+    y = notes(cv, x, y + 10, lang, d, [txt(n, lang) for n in view.get("notes", [])])
     cv.grow(y + 40)
     return cv.save(out)
 
 
-def render_overview(d, cfg, lang, results, out):
-    t = T[lang]
-    cv = Canvas(d, cfg, width=d["project"].get("overview_width", 3000), panel=1800)
-    cnt = draw_plan(cv, d, d["boosters"], results, lang, ant_labels=False, donor_labels=False)
+def render_overview(d, cfg, lang, results, out, floor=None):
+    t = T[lang]; ants = antenna_index(d)
+    cv = Canvas(d, cfg, width=d["project"].get("overview_width", 3000), panel=1900, floor=floor)
+    cnt = draw_plan(cv, d, d["boosters"], results, lang, ant_labels=False, donor_labels=False, panel_arrows=False)
+    on = [ants[r["antenna"]] for b in d["boosters"] for r in results[b["id"]] if on_floor(ants[r["antenna"]], d, cv.floor)]
     x, y = cv.base_w + 30, 30
-    n_ant = sum(len(v) for v in results.values())
-    title = f"{txt(d['project']['name'], lang)} – " + (f"{len(d['boosters'])} boosters, {n_ant} ceiling antennas" if lang == "en"
-                                                       else f"{len(d['boosters'])} 台主机，{n_ant} 支吸顶天线")
-    cv.d.text((x, y), title, font=cv.f(42), fill="black"); y += 80
-    y = legend(cv, x, y, d["boosters"], cnt, lang)
+    n_ant = len(on)
+    nb = len([b for b in d["boosters"] if on_floor(b, d, cv.floor)])
+    what = (f"{nb} boosters, {n_ant} antennas" if lang == "en" else f"{nb} 台主机，{n_ant} 支天线")
+    cv.d.text((x, y), _title(d, lang, cv.floor, what), font=cv.f(40), fill="black"); y += 80
+    y = legend(cv, x, y, d["boosters"], cnt, lang, d, has_panel=any(a.get("type") == "panel" for a in on),
+               has_ceiling=any(a.get("type", "ceiling") != "panel" for a in on))
     cols = [x, x + 170, x + 900, x + 1060, x + 1220]
     for c, h in zip(cols, t["bcols"]):
         cv.d.text((c, y), h, font=cv.f(28), fill="black")
     y += 46
     for b in d["boosters"]:
-        ps = [r["out_dbm"] for r in results[b["id"]]]
-        for c, v in zip(cols, [f"{t['booster']} {b['id']}", txt(b.get("location", ""), lang), f"{b['power_dbm']} dBm", str(len(ps)),
-                               f"{min(ps):.1f} ~ {max(ps):.1f} dBm"]):
+        ps = [v["out_dbm"] for r in results[b["id"]] for v in r["by_band"].values()]
+        for c, v in zip(cols, [f"{t['booster']} {b['id']}", txt(b.get("location", ""), lang), f"{b['power_dbm']:g} dBm",
+                               str(len(results[b["id"]])), f"{min(ps):.2f} ~ {max(ps):.2f} dBm"]):
             cv.d.text((c, y), v, font=cv.f(26), fill="black")
         y += 42
-    y = notes(cv, x, y + 20, lang)
+    y = notes(cv, x, y + 20, lang, d)
     cv.grow(y + 40)
     return cv.save(out)

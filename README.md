@@ -30,8 +30,12 @@ The [dated supplement in SKILL.md](SKILL.md#补充规则2026-11-24) adds the own
     with legend quantities;
   - bill of materials (boosters by power, couplers, splitters, antennas, cable indoor/donor/order
     quantity in m and ft, connectors) and per-antenna CSV, all in `en/` and `zh/`.
-- **Editable equipment config** (`config/equipment.yaml`): cable loss, booster powers, coupler and
-  splitter losses, antenna output window, colours, fonts.
+- **Editable equipment config** (`config/equipment.yaml`, regional profiles in `config/regions/`):
+  cable loss (single value or per band), booster powers / real model table, coupler and splitter losses,
+  antenna output window, colours, fonts.
+- **Multi-floor** plans with real vertical runs, **wall-mounted panel antennas**, **per-band** checks and
+  model/band validation (`examples/demo-hotel/`).
+- **Regression tests** with golden numbers: `python tests/run_tests.py`.
 
 ## Install
 

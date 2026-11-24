@@ -11,5 +11,8 @@ font is needed (Noto Sans CJK, PingFang, Microsoft YaHei …); add its path to `
 Quick test: `python scripts/coverage.py report examples/demo-factory/design.json`
 → drawings, CSVs and reports in `examples/demo-factory/output/{zh,en}/`.
 
+After changing anything under `scripts/`, run `python tests/run_tests.py`; it must pass. The golden files in
+`tests/golden/` are the reference numbers for any other implementation of the engine (e.g. the web tool).
+
 Put each new project in its own folder (e.g. `projects/<name>/` with `floorplan.png` and
 `design.json`); do not commit client drawings to the public repository.

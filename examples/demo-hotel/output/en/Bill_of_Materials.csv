@@ -1,0 +1,27 @@
+﻿Item,Spec,Qty,Unit,Notes
+Booster (single output port),Hi23-6S-PLUS CE 23 dBm,1,pcs,M1
+Indoor ceiling antenna,,3,pcs,
+Wall-mounted panel antenna,,3,pcs,
+Donor antenna,,1,pcs,"1 per booster, facing the base station"
+Coupler,5 dB,0,pcs,
+Coupler,8 dB,1,pcs,
+Coupler,10 dB,0,pcs,
+Splitter,1:2,0,pcs,
+Splitter,1:3,2,pcs,
+Splitter,1:4,0,pcs,
+5D cable – indoor distribution,1800 MHz 29.7 dB/100 m,126.5,m,≈ 415 ft
+  vertical runs between floors (included above),,3.0,m,
+5D cable – donor (booster → roof),,25,m,≈ 82 ft
+5D cable – total (estimate),,152,m,≈ 497 ft
+5D cable – suggested order,,180,m,"≈ 591 ft, +15% margin"
+N-type connector,,20,pcs,2 per segment (9 indoor segments + 1 donor runs)
+
+Per-booster breakdown
+Booster,Output,Antennas,Devices,Indoor cable (m),Donor cable (m)
+M1,Hi23-6S-PLUS CE 23 dBm,6,"1:3×2, 8dB×1",126,25
+
+Assumptions
+Right-angle routing measured on the drawing.
+5.0 m riser from each booster to the ceiling; 1.0 m slack per antenna.
+Donor cable = right-angle distance booster → roof corner + 5.0 m riser + 3.0 m through the roof.
+Ceiling height is assumed; confirm on site.

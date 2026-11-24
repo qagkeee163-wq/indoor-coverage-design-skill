@@ -5,7 +5,8 @@
 
 cable:
   name: LMR400
-  loss_db_per_100m: 18.6        # 1800 MHz
+  loss_db_per_100m: 18.6        # LMR400 @1800 MHz. May also be a table per band, e.g. {700: 13.2, 1800: 18.6}
+  band_mhz: 1800                # band the scalar value refers to (shown on drawings)
   riser_m: 5.0                  # booster -> ceiling vertical run (adjust to real ceiling height) 主机到吊顶
   slack_per_antenna_m: 1.0      # spare cable at each antenna 每支天线余量
   donor_roof_m: 3.0             # through-roof run for donor cable 施主线穿屋顶
@@ -15,6 +16,7 @@ cable:
 antenna_output:
   min_dbm: 0.0                  # exclusive, tested on unrounded results
   max_dbm: 8.0                  # exclusive, tested on unrounded results
+  warn_margin_db: 1.0           # warn when an antenna is within this of either limit
 
 # Americas REFERENCE booster powers only; actual user inventory overrides.
 # 美洲参考档，不是通用库存；欧洲必须用用户给过的欧版型号和功率。
@@ -44,6 +46,7 @@ ceiling_antenna:     # rules of thumb for step 1
   radius_m: 10
   wall_penetration_m: [3, 5]
 panel_antenna_range_m: [15, 20]
+panel_half_width_m: 5           # ~10 m total lateral width for a first check
 
 margins:             # step 3 (from the original workflow notes)
   end_db: [2, 3]

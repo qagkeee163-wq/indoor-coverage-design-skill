@@ -39,7 +39,46 @@ See `examples/demo-factory/design.json` for a complete file.
 }
 ```
 
-The stock renderer and BOM use one flat plan. For separate floor plans, keep display offsets for alignment only and model vertical cable as a physical length on the shared trunk. Use the same unique-segment ledger for cable takeoff.
+## Multi-floor, panels, bands, models (v2)
+
+See `examples/demo-hotel/design.json` (2 floors, panels, Europe 5D profile).
+
+```jsonc
+{
+  "project": {"name": "...", "region": "europe",
+              "bands": [800, 1800],          // every band is checked; loss per band comes from the config
+              "design_band": 1800},          // optional: band shown in single-value tables (default: highest loss)
+  "floors": [                                // replaces project.floorplan / m_per_px
+    {"id": "B", "name": {"en": "Basement", "zh": "地下室"}, "floorplan": "basement.png", "m_per_px": 0.03, "elevation_m": 0},
+    {"id": "G", "name": {"en": "Ground floor", "zh": "首层"}, "floorplan": "ground.png", "m_per_px": 0.03, "elevation_m": 3.0}],
+  "areas":    [{"id": "SPA", "floor": "B", "rect": [...]}],
+  "idf":      [{"floor": "B", "pos": [700, 660]}],
+  "antennas": [{"id": "B1", "floor": "B", "pos": [230, 330]},
+               {"id": "G1", "floor": "G", "pos": [30, 250], "type": "panel",
+                "aim_deg": 90,                 // 0 = up/north, 90 = right/east, 180 = down, 270 = left
+                "range_m": 18, "half_width_m": 5}],
+  "boosters": [{"id": "M1", "floor": "B", "model": "Hi23-6S-PLUS CE", "power_dbm": 23,
+                "power_by_band": {"800": 20, "1800": 20},   // only after the user confirmed per-band output
+                "per_band_confirmed": true,
+                "donor_cable_m": 25,                         // optional: confirmed donor route length
+                "feed": [...], "tree": {...}}],
+  "views": [{"floor": "G", "boosters": ["M1"], "panel_arrows": false, ...}]
+}
+```
+
+- **Floor change inside a path**: a point `[x, y, "G"]` moves the cable to floor G. The vertical length
+  is `|elevation(G) − elevation(previous floor)|`; the x/y jump between the two plans is only alignment and
+  is not counted. Drawings mark the riser "→ Ground floor" / "from Basement".
+- Nodes have no floor field: a device is on the floor where its incoming path ends. `check` reports an
+  error when a cable reaches an antenna on a different floor than `antennas[].floor`.
+- **Panel antennas**: the last short segment of the feeder must travel in the aim direction (fed from behind).
+- **Extra cable to burn power**: on a branch, `"extra_m": 4, "extra_approved": true`. Without
+  `extra_approved` it is an error – show the user the extra length, loss and new output first.
+- **Model checks** (when the config has `booster_models`): the model must support every project band;
+  `power_dbm` ≤ model max; for a `total` power model and more than one band, `power_by_band` and
+  `per_band_confirmed` are required — never split the total evenly on your own.
+- Cable loss per band: `cable.loss_db_per_100m` in the config may be a table `{band: dB/100 m}`; an empty
+  value stops the calculation with a request for the datasheet value.
 
 ## Nodes
 

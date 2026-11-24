@@ -1,0 +1,7 @@
+﻿Area,Booster,Booster output,Booster location,Antenna,Cable length (m),Cable loss (dB) @1800,Device loss (dB),Total loss (dB) @1800,Antenna output (dBm) @1800,Floor,Path (devices passed)
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",B1,29.4,8.73,13.2,21.93,1.07,B,8 dB coupler (coupled) −8.0 → 1:3 splitter −5.2
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",B2,18.3,5.44,13.2,18.64,4.36,B,8 dB coupler (coupled) −8.0 → 1:3 splitter −5.2
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",B3,29.7,8.82,13.2,22.02,0.98,B,8 dB coupler (coupled) −8.0 → 1:3 splitter −5.2
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",G1,49.8,14.79,6.3,21.09,1.91,G,8 dB coupler (through) −1.1 → 1:3 splitter −5.2
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",G2,39.3,11.67,6.3,17.97,5.03,G,8 dB coupler (through) −1.1 → 1:3 splitter −5.2
+Basement + ground floor,Booster M1,Hi23-6S-PLUS CE 23 dBm,"IDF (basement, service room)",G3,43.8,13.01,6.3,19.31,3.69,G,8 dB coupler (through) −1.1 → 1:3 splitter −5.2

@@ -1,0 +1,79 @@
+# Equipment & design parameters / 设备与设计参数
+# 补充（2026-11-24）：本文件保留参考数值；地区选型约定见 references/regional-equipment.md。
+# Europe profile (5D). Copy per project, fill the missing per-band losses, confirm per-band output.
+
+cable:
+  name: 5D
+  # dB/100 m per band (MHz). Fill from the datasheet of the EXACT 5D cable used. Empty = unknown:
+  # the tool stops and asks instead of guessing. 1800: 29.7 was confirmed on one past project only.
+  loss_db_per_100m:
+    700: null
+    800: null
+    900: null
+    1800: 29.7
+    2100: null
+    2600: null
+  riser_m: 5.0                  # booster -> ceiling vertical run (adjust to real ceiling height) 主机到吊顶
+  slack_per_antenna_m: 1.0      # spare cable at each antenna 每支天线余量
+  donor_roof_m: 3.0             # through-roof run for donor cable 施主线穿屋顶
+  order_margin: 0.15            # +15 % when ordering 采购余量
+  connectors_per_segment: 2     # N-type connectors per cable segment
+
+antenna_output:
+  min_dbm: 0.0                  # exclusive, tested on unrounded results
+  max_dbm: 8.0                  # exclusive, tested on unrounded results
+  warn_margin_db: 1.0           # warn when an antenna is within this of either limit
+
+# Europe: powers come from the real product table below. Colours by output power.
+boosters:
+  - {power_dbm: 23, color: [185, 25, 40]}    # red
+  - {power_dbm: 20, color: [184, 134, 11]}   # gold
+booster_models:        # user-supplied F23H1-6S-V04 table; keep in sync with the latest product sheet
+  - {model: Hi20-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total}
+  - {model: Hi20-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total}
+  - {model: Hi23-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total}
+  - {model: Hi23-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total}
+# power_basis: total = dl_max_dbm is the whole-unit DL output, NOT per band / per carrier.
+
+couplers:            # value -> losses (dB) and drawing color
+  5:  {coupled: 5.0,  through: 2.15, color: [0, 150, 70]}    # green
+  8:  {coupled: 8.0,  through: 1.1,  color: [30, 90, 220]}   # blue
+  10: {coupled: 10.0, through: 0.8,  color: [50, 50, 50]}    # black
+
+splitters:           # ways -> loss per output port (dB)
+  2: {loss: 3.3, fill: [120, 215, 235], line: [20, 110, 150]}   # light blue
+  3: {loss: 5.2, fill: [250, 215, 80],  line: [170, 120, 0]}    # yellow
+  4: {loss: 6.4, fill: [245, 160, 200], line: [170, 50, 110]}   # pink
+
+ceiling_antenna:     # rules of thumb for step 1
+  area_m2: 300
+  radius_m: 10
+  wall_penetration_m: [3, 5]
+panel_antenna_range_m: [15, 20]
+panel_half_width_m: 5           # ~10 m total lateral width for a first check
+
+margins:             # step 3 (from the original workflow notes)
+  end_db: [2, 3]
+  antenna_db: [4, 6]
+
+optimizer:           # score = min - w_spread*(max-min) - w_mad*MAD
+  w_spread: 0.3
+  w_mad: 0.3
+  brute_force_max_couplers: 11   # above this, coordinate descent is used
+
+colors:
+  cable: [235, 120, 30]          # orange feeder
+  antenna: [120, 40, 200]        # purple dot
+  donor: [40, 170, 40]           # green triangle, points north
+  area: [30, 100, 200]
+  idf: [220, 0, 0]
+
+fonts:   # first existing file wins; must contain CJK glyphs for the Chinese version
+  - /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc
+  - /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+  - /usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc
+  - /System/Library/Fonts/PingFang.ttc
+  - /System/Library/Fonts/STHeiti Medium.ttc
+  - C:/Windows/Fonts/msyhbd.ttc
+  - C:/Windows/Fonts/msyh.ttc
+  - C:/Windows/Fonts/simhei.ttf

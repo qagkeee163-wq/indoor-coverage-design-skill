@@ -32,15 +32,18 @@ description: "室内蜂窝信号覆盖与直放站室分方案设计。用户说
 ## 计算工具
 
 ```text
-python scripts/coverage.py areas    DESIGN.json
-python scripts/coverage.py layout   DESIGN.json
+python scripts/coverage.py areas    DESIGN.json --config EQUIPMENT.yaml          # 每层一张区域图
+python scripts/coverage.py layout   DESIGN.json --config EQUIPMENT.yaml          # 理论布点：吸顶圆 / 板状前向×侧向
 python scripts/coverage.py optimize DESIGN.json --config EQUIPMENT.yaml --powers POWER_LIST
 python scripts/coverage.py check    DESIGN.json --config EQUIPMENT.yaml --lang zh
 python scripts/coverage.py report   DESIGN.json --config EQUIPMENT.yaml
+python tests/run_tests.py                                                         # 改代码后必跑
 ```
 
-`POWER_LIST` 用项目可用的逗号分隔功率档替换。将已确认的地区线材、逐频段线损与可用功率放进项目独立 YAML，通过 `--config` 加载；欧洲项目不得直接使用默认美洲参考配置。优化器在搜索到的可行配件配置中优先使用较低功率。用 `check` 核验每路输出和走线提示。
+- 地区配置：美洲从 `config/regions/americas-lmr400.yaml` 复制，欧洲从 `config/regions/europe-5d.yaml` 复制，放到项目文件夹再改成项目实际值。欧洲配置的 5D 线损按频段填写，空着的频段一旦用到，工具会停下并提示索取规格值；产品表 `booster_models` 用于核对型号、频段和最大输出。
+- `POWER_LIST` 用项目可用的逗号分隔功率档。优化器从低到高试，取第一个能让所有天线严格满足 0 < P < 8 dBm 的档位；某台主机无解时，其他主机的结果仍会保存，并以错误码退出。
+- `check` 逐频段核算每支天线，给出每台主机的可行输出区间 (最大损耗 + 下限, 最小损耗 + 上限)，并检查：越界（错误）、距上下限不足 `warn_margin_db`（提示）、未经确认的加线 `extra_m`（错误）、整机总功率未确认逐频段输出（错误）、型号不支持所需频段（错误）、天线楼层与线缆楼层不符（错误）、板状天线未从背面接线、重复并行走线、耦合器未对齐、功分器进出边、IDF 规则。
+- 多楼层：`floors` 每层一张底图和比例；路径点写成 `[x, y, "楼层ID"]` 表示过层，垂直长度按两层标高差计入，图上标“至 / 接自 某层”。材料清单按物理段去重，单列过层垂直段。
+- 数据格式见 [design-file-format.md](references/design-file-format.md)。示例：`examples/demo-factory/`（单层、美洲 LMR400）和 `examples/demo-hotel/`（两层、板状天线、欧洲 5D，故意保留了几条提示，用于展示检查效果）。
 
-使用本机可用的 Python 3.9+ 和实际技能目录，依赖见 `requirements.txt`；若环境使用独立解释器或依赖目录，显式指定相应路径。项目资料及生成输出放在用户工作区，设备参数通过项目专用 `--config` 加载，不修改技能参考配置代替项目记录。
-
-示例 `examples/demo-factory/` 为虚构单层工程。默认绘图与领料汇总面向单层平面。多层项目分层出图，可用等效长度树做逐路验算，并用同一套物理段清单统计线缆。
+使用本机可用的 Python 3.9+ 和实际技能目录，依赖见 `requirements.txt`。项目资料及生成输出放在用户工作区，设备参数通过项目专用 `--config` 加载，不修改技能参考配置代替项目记录。

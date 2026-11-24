@@ -1,0 +1,74 @@
+{
+ "config": "config/regions/europe-5d.yaml",
+ "design": "examples/demo-hotel/design.json",
+ "results": {
+  "M1": [
+   {
+    "antenna": "B1",
+    "length_m": 29.4,
+    "device_db": 13.2,
+    "by_band": {
+     "1800": {
+      "cable_db": 8.732,
+      "out_dbm": 1.068
+     }
+    }
+   },
+   {
+    "antenna": "B2",
+    "length_m": 18.3,
+    "device_db": 13.2,
+    "by_band": {
+     "1800": {
+      "cable_db": 5.435,
+      "out_dbm": 4.365
+     }
+    }
+   },
+   {
+    "antenna": "B3",
+    "length_m": 29.7,
+    "device_db": 13.2,
+    "by_band": {
+     "1800": {
+      "cable_db": 8.821,
+      "out_dbm": 0.979
+     }
+    }
+   },
+   {
+    "antenna": "G1",
+    "length_m": 49.8,
+    "device_db": 6.3,
+    "by_band": {
+     "1800": {
+      "cable_db": 14.791,
+      "out_dbm": 1.909
+     }
+    }
+   },
+   {
+    "antenna": "G2",
+    "length_m": 39.3,
+    "device_db": 6.3,
+    "by_band": {
+     "1800": {
+      "cable_db": 11.672,
+      "out_dbm": 5.028
+     }
+    }
+   },
+   {
+    "antenna": "G3",
+    "length_m": 43.8,
+    "device_db": 6.3,
+    "by_band": {
+     "1800": {
+      "cable_db": 13.009,
+      "out_dbm": 3.691
+     }
+    }
+   }
+  ]
+ }
+}
