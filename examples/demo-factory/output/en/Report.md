@@ -41,3 +41,4 @@
 - Production_Office.png
 - Warehouse.png
 - Areas.png
+- Connection_Diagram.png

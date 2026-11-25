@@ -33,3 +33,4 @@
 - Ground_floor.png
 - Areas_Basement.png
 - Areas_Ground_floor.png
+- Connection_Diagram.png
