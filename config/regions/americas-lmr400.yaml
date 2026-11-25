@@ -49,6 +49,11 @@ ceiling_antenna:     # rules of thumb for step 1
 panel_antenna_range_m: [15, 20]
 panel_half_width_m: 5           # ~10 m total lateral width for a first check
 
+layout_checks:       # added 2026-11-25 (Nîmes review); warnings only
+  max_detour_m: 1.5              # back-and-forth cable (来回布线) beyond the direct right-angle route → move device/antenna
+  panel_overlap_warn_ratio: 0.2  # share of the smaller panel footprint that may overlap (edges only)
+  ceiling_min_spacing_ratio: 1.0 # ceiling antennas closer than this × radius overlap heavily
+
 margins:             # step 3 (from the original workflow notes)
   end_db: [2, 3]
   antenna_db: [4, 6]

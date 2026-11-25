@@ -128,6 +128,81 @@ def rules():
     check("feasible window = (max L + min, min L + max)", abs(win[0] - max(Ls)) < 1e-9 and abs(win[1] - min(Ls) - 8) < 1e-9)
 
 
+def nimes_rules():
+    """Rules added after the Nîmes (France) project review, 2026-11-25."""
+    cfg = engine.load_config(os.path.join(ROOT, "config/regions/europe-5d.yaml"))
+    base = engine.load_design(os.path.join(ROOT, "examples/demo-hotel/design.json"))
+
+    # 10. antenna count per model: Hi20 about 6–7 (7 max), Hi23 about 8–9 (9 max)
+    d = copy.deepcopy(base); d["boosters"][0]["model"] = "Hi20-6S-PLUS CE"; d["boosters"][0]["power_dbm"] = 20
+    c = copy.deepcopy(cfg)
+    for m in c["booster_models"]:
+        if m["model"].startswith("Hi20"):
+            m["antennas_typical"] = [4, 5]          # 6 antennas in the hotel → above the max
+    errs, _ = lint(d, c, engine.evaluate_all(d, c))
+    check("too many antennas for the model is an error", any("more than its maximum" in e for e in errs))
+    for m in c["booster_models"]:
+        if m["model"].startswith("Hi20"):
+            m["antennas_typical"] = [5, 6]
+    errs, warns = lint(d, c, engine.evaluate_all(d, c))
+    check("antenna count at the upper limit warns", any("upper limit" in w for w in warns)
+          and not any("more than its maximum" in e for e in errs))
+    check("Europe config lists Hi20 6–7 / Hi23 8–9",
+          {m["model"][:4]: tuple(m["antennas_typical"]) for m in cfg["booster_models"]} == {"Hi20": (6, 7), "Hi23": (8, 9)})
+
+    # 11. back-and-forth wiring: the cable to B2 runs 3 m past the antenna and comes back
+    d = copy.deepcopy(base)
+    s1 = d["boosters"][0]["tree"]["coupled"]["node"]
+    s1["outputs"][1]["path"] = [[600, 420], [600, 230], [600, 330]]
+    _, warns = lint(d, cfg, engine.evaluate_all(d, cfg))
+    check("back-and-forth cable is flagged", any("back-and-forth" in w and "B2" in w for w in warns))
+    _, warns = lint(base, cfg, engine.evaluate_all(base, cfg))
+    check("a small panel back-entry offset is not flagged", not any("back-and-forth" in w for w in warns))
+    from covtool.lint import detour_m
+    check("detour of an L-route is zero", abs(detour_m([[0, 0], [100, 0], [100, 50]], "B", base)) < 1e-9)
+
+    # 12. coverage overlap between panels on the same floor
+    _, warns = lint(base, cfg, engine.evaluate_all(base, cfg))
+    check("overlapping panel footprints warn", any("panels G1 and G2" in w and "self-oscillation" in w for w in warns))
+    d = copy.deepcopy(base)
+    for a in d["antennas"]:
+        if a["id"] == "G2":
+            a["range_m"] = 2; a["half_width_m"] = 3      # ≈13 % edge overlap
+    _, warns = lint(d, cfg, engine.evaluate_all(d, cfg))
+    check("slight edge overlap is accepted", not any("panels G1 and G2" in w for w in warns))
+
+    # 13. the stronger booster should take the longer runs
+    fac_cfg = engine.load_config(os.path.join(ROOT, "config/equipment.yaml"))
+    fac = engine.load_design(os.path.join(ROOT, "examples/demo-factory/design.json"))
+    res = engine.evaluate_all(fac, fac_cfg)
+    worst = {b: max(r["total_db"] for r in rs) for b, rs in res.items()}
+    hi, lo = sorted(worst, key=worst.get)            # lo = longer runs
+    f2 = copy.deepcopy(fac)
+    for b in f2["boosters"]:
+        b["power_dbm"] = 27 if b["id"] == hi else 17
+    _, warns = lint(f2, fac_cfg, engine.evaluate_all(f2, fac_cfg))
+    check("weaker booster on the longer runs warns", any("weaker booster" in w for w in warns))
+
+    # 14. connection diagram + customer version
+    import tempfile
+    from covtool.connection import render_connection
+    from covtool import render
+    tmp = tempfile.mkdtemp()
+    res = engine.evaluate_all(base, cfg)
+    for client in (False, True):
+        out = render_connection(base, cfg, "en", res, os.path.join(tmp, f"c{int(client)}.png"), client=client)
+        check(f"connection diagram ({'customer' if client else 'design'}) is written", os.path.getsize(out) > 1000)
+    d = copy.deepcopy(base)
+    for f in d["floors"]:
+        f["outline"] = [[0, 0], [1200, 0], [1200, 700], [0, 700]]
+    out = render.render_client_plan(d, cfg, "en", res, os.path.join(tmp, "plan.png"), floor="G")
+    check("customer outline plan is written", os.path.getsize(out) > 1000)
+    from covtool import bom as bomm
+    bomm.write_bom(base, cfg, "en", os.path.join(tmp, "bom.csv"), client=True)
+    txt_ = open(os.path.join(tmp, "bom.csv"), encoding="utf-8-sig").read()
+    check("customer BOM has no cable-loss spec or assumptions", "dB/100" not in txt_ and "Assumptions" not in txt_)
+
+
 def cli():
     import shutil, tempfile
     tmp = tempfile.mkdtemp()
@@ -151,6 +226,7 @@ def cli():
 if __name__ == "__main__":
     golden("--update" in sys.argv)
     rules()
+    nimes_rules()
     cli()
     print(f"\n{len(FAILS)} failure(s)" if FAILS else "\nall tests passed")
     sys.exit(1 if FAILS else 0)

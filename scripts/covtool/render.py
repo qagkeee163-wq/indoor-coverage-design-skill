@@ -35,7 +35,7 @@ def C(c):
 
 
 class Canvas:
-    def __init__(self, d, cfg, crop=None, width=2400, panel=1700, fade=110, floor=None):
+    def __init__(self, d, cfg, crop=None, width=2400, panel=1700, fade=110, floor=None, outline_only=False):
         self.floor = floor or geom.default_floor(d)
         fl = geom.floors(d)[self.floor]
         self.k = float(fl["m_per_px"])
@@ -45,6 +45,12 @@ class Canvas:
         self.z = width / img.width
         img = img.resize((width, max(1, int(img.height * self.z))), Image.LANCZOS)
         img = Image.alpha_composite(img, Image.new("RGBA", img.size, (255, 255, 255, fade)))
+        if outline_only and fl.get("outline"):
+            # customer version without a customer floor plan: plain outline only, nothing inside or outside
+            img = Image.new("RGBA", img.size, "white")
+            dr = ImageDraw.Draw(img)
+            pts = [((p[0] - crop[0]) * self.z, (p[1] - crop[1]) * self.z) for p in fl["outline"]]
+            dr.line(pts + [pts[0]], fill=(40, 40, 40), width=6)
         self.base_w, self.base_h = img.size
         self.im = Image.new("RGBA", (img.width + panel, img.height), "white")
         self.im.paste(img, (0, 0))
@@ -219,8 +225,12 @@ def render_layout(d, cfg, lang, out, floor=None):
 
 
 # ---------------------------------------------------------------- plans
-def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True, panel_arrows=True):
+def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True, panel_arrows=True, client=False):
+    """client=True: customer version – no labels at boosters / antennas / devices, no arrows, no lengths."""
     cfg = cv.cfg; t = T[lang]; ants = antenna_index(d); FL = cv.floor
+    if client:
+        ant_labels = donor_labels = panel_arrows = False
+    multi = len(d["boosters"]) > 1
     OR = C(cfg["colors"]["cable"]); W = 8
     cnt = Counter()
     devs = []
@@ -229,16 +239,22 @@ def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True
         if len(pts) > 1:
             cv.d.line([cv.P(p) for p in expand(pts)], fill=OR, width=W, joint="curve")
 
+    cur_b = [None]
+
     def rise_marks(rises):
+        # every booster keeps its own riser: with several boosters the riser label names its booster
+        tag = f" ({t['booster']} {cur_b[0]})" if multi and cur_b[0] else ""
         for r in rises:
             if r["from_floor"] == FL:
                 X, Y = cv.P(r["at_from"])
                 cv.d.ellipse([X - 12, Y - 12, X + 12, Y + 12], fill="white", outline=OR, width=5)
-                cv.label((X + 16, Y + 6), t["to_floor"].format(f=floor_name(d, r["to_floor"], lang)), 26, OR)
+                if not client:
+                    cv.label((X + 16, Y + 6), t["to_floor"].format(f=floor_name(d, r["to_floor"], lang)) + tag, 26, OR)
             if r["to_floor"] == FL:
                 X, Y = cv.P(r["at_to"])
                 cv.d.ellipse([X - 12, Y - 12, X + 12, Y + 12], fill=OR, outline="white", width=3)
-                cv.label((X + 16, Y + 6), t["from_floor"].format(f=floor_name(d, r["from_floor"], lang)), 26, OR)
+                if not client:
+                    cv.label((X + 16, Y + 6), t["from_floor"].format(f=floor_name(d, r["from_floor"], lang)) + tag, 26, OR)
 
     def draw_branch(path, start_floor, splitter=None, lane=0):
         pieces, rises, end = geom.split_path(path, start_floor, d)
@@ -265,7 +281,7 @@ def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True
         cv.d.line([s0, lane] + (q[2:] if len(q) > 2 else [p1]), fill=OR, width=W, joint="curve")
 
     for b in boosters:
-        nf = node_floors(b, d)
+        nf = node_floors(b, d); cur_b[0] = b["id"]
 
         def walk(n, inpath):
             if n["type"] == "antenna":
@@ -297,14 +313,16 @@ def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True
                 lx, ly = X - hd[0] * BL / 2 - 30, Y + (12 if td[1] <= 0 else -40)
             else:
                 lx, ly = X + 14, Y - hd[1] * BL / 2 - 10
-            cv.d.text((lx, ly), f"{n['value']}dB", font=cv.f(26), fill=c)
+            if not client:
+                cv.d.text((lx, ly), f"{n['value']}dB", font=cv.f(26), fill=c)
         else:
             w = len(n["outputs"]); sp = cfg["splitters"][w]; fc, oc = C(sp["fill"]), C(sp["line"])
             orient = n.get("orient") or ("h" if _dir(n["outputs"][0]["path"])[0] == 0 else "v")
             L, T2 = 34, 12
             box = [X - L, Y - T2, X + L, Y + T2] if orient == "h" else [X - T2, Y - L, X + T2, Y + L]
             cv.d.rectangle(box, fill=fc, outline=oc, width=3)
-            cv.d.text((box[2] + 4, box[1] - 30), f"1:{w}", font=cv.f(28), fill=oc)
+            if not client:
+                cv.d.text((box[2] + 4, box[1] - 30), f"1:{w}", font=cv.f(28), fill=oc)
 
     pu = C(cfg["colors"]["antenna"])
     for b in boosters:
@@ -323,6 +341,8 @@ def draw_plan(cv, d, boosters, results, lang, ant_labels=True, donor_labels=True
             continue
         X, Y = cv.P(b["pos"]); hc = booster_color(cfg, b["power_dbm"])
         cv.d.rectangle([X - 16, Y - 32, X + 16, Y + 32], fill=hc, outline="black", width=3)
+        if client:
+            continue
         lab = f"{t['booster']} {b['id']}  {b['power_dbm']:g}dBm"; fs = 34; tw = cv.d.textlength(lab, font=cv.f(fs))
         bx = (X - 40 - tw, X - 30) if b.get("label_side", "L") == "L" else (X + 30, X + 40 + tw)
         dy = b.get("label_dy", 0)
@@ -443,5 +463,58 @@ def render_overview(d, cfg, lang, results, out, floor=None):
             cv.d.text((c, y), v, font=cv.f(26), fill="black")
         y += 42
     y = notes(cv, x, y + 20, lang, d)
+    cv.grow(y + 40)
+    return cv.save(out)
+
+
+# ---------------------------------------------------------------- customer version
+def client_legend(cv, x, y, boosters, cnt, lang, d, has_panel=False, has_ceiling=True):
+    """Symbols only: no powers, losses, cable lengths or quantities."""
+    cfg = cv.cfg; t = T[lang]
+    seen = set()
+    for b in sorted(boosters, key=lambda b: -b["power_dbm"]):
+        c = booster_color(cfg, b["power_dbm"])
+        if c in seen:
+            continue
+        seen.add(c); cv.d.rectangle([x + 18, y, x + 42, y + 44], fill=c)
+        cv.d.text((x + 80, y), t["booster"] + (f" ({b['model']})" if b.get("model") else ""), font=cv.f(30), fill="black"); y += 54
+    if any(b.get("donor") for b in boosters):
+        cv.d.polygon([(x + 30, y), (x + 12, y + 40), (x + 48, y + 40)], fill=C(cfg["colors"]["donor"]))
+        cv.d.text((x + 80, y), t["donor"], font=cv.f(30), fill="black"); y += 54
+    if has_ceiling:
+        cv.d.ellipse([x + 12, y + 4, x + 48, y + 40], fill=C(cfg["colors"]["antenna"]))
+        cv.d.text((x + 80, y), t["antenna"], font=cv.f(30), fill="black"); y += 54
+    if has_panel:
+        panel_symbol(cv, x + 30, y + 26, 0, C(cfg["colors"]["antenna"]), arrow=False)
+        cv.d.text((x + 80, y), t["panel"], font=cv.f(30), fill="black"); y += 54
+    cv.d.line([x, y + 22, x + 60, y + 22], fill=C(cfg["colors"]["cable"]), width=8)
+    cv.d.text((x + 80, y), t["cable_plain"].format(name=cfg["cable"]["name"]), font=cv.f(30), fill="black"); y += 60
+    for v, sp in sorted(cfg["couplers"].items()):
+        if not cnt.get(("coupler", v)):
+            continue
+        c = C(sp["color"]); cv.d.line([(x + 6, y + 30), (x + 56, y + 30)], fill=c, width=10); cv.d.line([(x + 56, y + 30), (x + 56, y + 10)], fill=c, width=10)
+        cv.d.text((x + 80, y), t["coupler_plain"].format(v=v), font=cv.f(30), fill="black"); y += 52
+    for w, sp in sorted(cfg["splitters"].items()):
+        if not cnt.get(("splitter", w)):
+            continue
+        cv.d.rectangle([x + 20, y + 4, x + 44, y + 44], fill=C(sp["fill"]), outline=C(sp["line"]), width=3)
+        cv.d.text((x + 80, y), t["splitter_plain"].format(w=w), font=cv.f(30), fill="black"); y += 52
+    return y + 16
+
+
+def render_client_plan(d, cfg, lang, results, out, floor=None, view=None):
+    """Customer plan: outline (when floors[].outline is given) or faded plan, symbols, cables, legend only."""
+    ants = antenna_index(d)
+    bs = [b for b in d["boosters"] if not view or b["id"] in view["boosters"]]
+    floor = floor or (view or {}).get("floor") or geom.default_floor(d)
+    cv = Canvas(d, cfg, crop=(view or {}).get("crop"), width=(view or {}).get("width", d["project"].get("overview_width", 2400)),
+                panel=900, floor=floor, outline_only=True)
+    cnt = draw_plan(cv, d, bs, results, lang, client=True)
+    on = [ants[r["antenna"]] for b in bs for r in results[b["id"]] if on_floor(ants[r["antenna"]], d, floor)]
+    x, y = cv.base_w + 30, 30
+    title = txt(view["title"], lang) if view else (floor_name(d, floor, lang) if d.get("floors") else txt(d["project"]["name"], lang))
+    cv.d.text((x, y), title, font=cv.f(40), fill="black"); y += 80
+    y = client_legend(cv, x, y, [b for b in bs if on_floor(b, d, floor)], cnt, lang, d, has_panel=any(a.get("type") == "panel" for a in on),
+                      has_ceiling=any(a.get("type", "ceiling") != "panel" for a in on))
     cv.grow(y + 40)
     return cv.save(out)

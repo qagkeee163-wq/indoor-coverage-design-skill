@@ -9,7 +9,8 @@ font is needed (Noto Sans CJK, PingFang, Microsoft YaHei …); add its path to `
 `config/equipment.yaml` if it is not found.
 
 Quick test: `python scripts/coverage.py report examples/demo-factory/design.json`
-→ drawings, CSVs and reports in `examples/demo-factory/output/{zh,en}/`.
+→ drawings, connection diagram, CSVs and reports in `examples/demo-factory/output/{zh,en}/`.
+Add `--client` for the customer version in `output/{zh,en}/client/`.
 
 After changing anything under `scripts/`, run `python tests/run_tests.py`; it must pass. The golden files in
 `tests/golden/` are the reference numbers for any other implementation of the engine (e.g. the web tool).

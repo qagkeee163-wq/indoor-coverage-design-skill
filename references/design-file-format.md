@@ -66,6 +66,15 @@ See `examples/demo-hotel/design.json` (2 floors, panels, Europe 5D profile).
 }
 ```
 
+- **Customer outline** (2026-11-25): `floors[].outline: [[x, y], ...]` — building outline in plan pixels. With it, the customer
+  version draws that outline on white instead of the plan image (use it when the customer gave no floor plans).
+- **Antennas per model** (2026-11-25): `booster_models[].antennas_typical: [usual, max]` in the config. `check` warns
+  above `usual` and errors above `max`.
+- **Layout checks** (2026-11-25), config `layout_checks`: `max_detour_m` (back-and-forth cable, default 1.5 m),
+  `panel_overlap_warn_ratio` (default 0.2 of the smaller panel footprint), `ceiling_min_spacing_ratio` (default 1.0 × radius).
+- **Outputs** (2026-11-25): `report` also writes `Connection_Diagram.png`; `report --client` adds the customer version in
+  `output/<lang>/client/` (02 connection diagram, 03 BOM without losses or powers, 04 plan per floor, 05 per view,
+  00 index). `connection` writes the connection diagram only.
 - **Floor change inside a path**: a point `[x, y, "G"]` moves the cable to floor G. The vertical length
   is `|elevation(G) − elevation(previous floor)|`; the x/y jump between the two plans is only alignment and
   is not counted. Drawings mark the riser "→ Ground floor" / "from Basement".

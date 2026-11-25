@@ -1,7 +1,7 @@
 """Design-rule checks. Each rule comes from a real correction made during design reviews."""
 from . import geom
 from .engine import (antenna_index, branches, node_pos, couplers_of, output_in_window, floor_pieces,
-                     node_floors, branch_length_m, bands)
+                     node_floors, branch_length_m, bands, count_antennas)
 
 
 def expand(pts):
@@ -70,6 +70,77 @@ def idf_list(d):
     return out
 
 
+def detour_m(path, start_floor, d):
+    """Cable walked beyond the shortest right-angle route, summed over the floors of one path (metres).
+
+    A plain L / Z route has zero detour; going past a point and coming back (来回布线) does not."""
+    fl = geom.floors(d)
+    pieces, _, _ = geom.split_path(path, start_floor, d)
+    out = 0.0
+    for f, pts in pieces:
+        if len(pts) < 2:
+            continue
+        walked = geom.manhattan(expand(pts))
+        direct = abs(pts[0][0] - pts[-1][0]) + abs(pts[0][1] - pts[-1][1])
+        out += (walked - direct) * float(fl[f]["m_per_px"])
+    return out
+
+
+def _rect_m(a, d, cfg):
+    """Axis-aligned panel footprint in metres for aims of 0/90/180/270°, else None."""
+    v = aim_vec(a.get("aim_deg", 0))
+    if not v:
+        return None
+    k = float(geom.floors(d)[geom.obj_floor(a, d)]["m_per_px"])
+    x, y = a["pos"][0] * k, a["pos"][1] * k
+    rng = float(a.get("range_m") or cfg["panel_antenna_range_m"][1])
+    hw = float(a.get("half_width_m") or cfg.get("panel_half_width_m", 5))
+    if v[0]:
+        xs = sorted((x, x + v[0] * rng)); ys = (y - hw, y + hw)
+    else:
+        ys = sorted((y, y + v[1] * rng)); xs = (x - hw, x + hw)
+    return (xs[0], ys[0], xs[1], ys[1])
+
+
+def _rect_overlap(r1, r2):
+    w = min(r1[2], r2[2]) - max(r1[0], r2[0]); h = min(r1[3], r2[3]) - max(r1[1], r2[1])
+    return max(0.0, w) * max(0.0, h)
+
+
+def layout_warnings(d, cfg):
+    """Coverage overlap between indoor antennas on the same floor (overlap raises the self-oscillation risk
+    and wastes antennas; a little overlap at the edges is fine)."""
+    warns = []
+    lc = cfg.get("layout_checks") or {}
+    ratio = float(lc.get("panel_overlap_warn_ratio", 0.2))
+    spacing = float(lc.get("ceiling_min_spacing_ratio", 1.0))
+    R = float(cfg["ceiling_antenna"]["radius_m"])
+    ants = list(antenna_index(d).values())
+    for i in range(len(ants)):
+        for j in range(i + 1, len(ants)):
+            a, b = ants[i], ants[j]
+            fa, fb = geom.obj_floor(a, d), geom.obj_floor(b, d)
+            if fa != fb:
+                continue
+            if a.get("type") == "panel" and b.get("type") == "panel":
+                ra, rb = _rect_m(a, d, cfg), _rect_m(b, d, cfg)
+                if not ra or not rb:
+                    continue
+                ov = _rect_overlap(ra, rb)
+                small = min((ra[2] - ra[0]) * (ra[3] - ra[1]), (rb[2] - rb[0]) * (rb[3] - rb[1]))
+                if small and ov / small > ratio:
+                    warns.append(f"panels {a['id']} and {b['id']}: {100 * ov / small:.0f}% of the smaller footprint "
+                                 "overlaps – overlap raises the self-oscillation risk; keep only slight edge overlap "
+                                 "(move, re-aim or remove one)")
+            elif a.get("type", "ceiling") != "panel" and b.get("type", "ceiling") != "panel":
+                k = float(geom.floors(d)[fa]["m_per_px"])
+                dist = (abs(a["pos"][0] - b["pos"][0]) ** 2 + abs(a["pos"][1] - b["pos"][1]) ** 2) ** 0.5 * k
+                if dist < spacing * R:
+                    warns.append(f"ceiling antennas {a['id']} and {b['id']} are only {dist:.1f} m apart (< {spacing * R:.0f} m): "
+                                 "heavy overlap – spread them or drop one")
+    return warns
+
+
 def lint(d, cfg, results):
     errs, warns = [], []
     fl = geom.floors(d)
@@ -108,6 +179,38 @@ def lint(d, cfg, results):
                 warns.append(f"[{bid}] no `model` – pick a real model from the project's product table")
             if allowed and b["power_dbm"] not in allowed and not b.get("power_by_band"):
                 errs.append(f"[{bid}] booster power {b['power_dbm']} dBm is not in the available list {sorted(allowed)}")
+
+        # ---- how many antennas one unit should feed (user rule: Hi20 ≈ 6–7, Hi23 ≈ 8–9)
+        n_ant = count_antennas(b["tree"])
+        m = models.get(b.get("model"))
+        if m and m.get("antennas_typical"):
+            usual, mx = [int(x) for x in m["antennas_typical"]]
+            if n_ant > mx:
+                errs.append(f"[{bid}] {b['model']} feeds {n_ant} antennas – more than its maximum of {mx}; "
+                            "use a stronger model or split the floors between two boosters")
+            elif n_ant > usual:
+                warns.append(f"[{bid}] {b['model']} feeds {n_ant} antennas – at its upper limit ({usual}–{mx}); "
+                             "check the far branches carefully")
+
+        # ---- back-and-forth wiring (来回布线): cable longer than the direct right-angle route
+        max_det = float((cfg.get("layout_checks") or {}).get("max_detour_m", 1.5))
+        nf0 = node_floors(b, d)
+
+        def detours(n, floor, name):
+            for port, br in branches(n):
+                det = detour_m(br["path"], floor, d)
+                child = br["node"]
+                cname = child["id"] if child["type"] == "antenna" else f"{child['type']} {child.get('id', '')}"
+                if det > max_det:
+                    warns.append(f"[{bid}] {name} {port} → {cname}: {det:.1f} m of back-and-forth cable – move the "
+                                 f"{'antenna' if child['type'] == 'antenna' else 'device'} or {name} so the cable "
+                                 "arrives directly (no going past and coming back)")
+                if child["type"] != "antenna":
+                    detours(child, nf0[id(child)], f"{child['type']} {child.get('id', '')}")
+        fd = detour_m(b["feed"], geom.obj_floor(b, d), d)
+        if fd > max_det:
+            warns.append(f"[{bid}] feed: {fd:.1f} m of back-and-forth cable – move the first device to the real branch point")
+        detours(b["tree"], nf0[id(b["tree"])], f"{b['tree']['type']} {b['tree'].get('id', '')}")
 
         if geom.xy(b["feed"][0]) != geom.xy(b["pos"]):
             errs.append(f"[{bid}] feed must start at the booster position")
@@ -154,8 +257,10 @@ def lint(d, cfg, results):
                 if len(dirs) > 1:
                     warns.append(f"[{bid}] splitter {n.get('id','')}: all outputs must leave the same long side "
                                  "(first hop of every output in the same direction)")
-                elif inpath is not None and last_dir(inpath) != dirs.pop():
-                    warns.append(f"[{bid}] splitter {n.get('id','')}: input must enter the long side opposite the outputs")
+                elif inpath is not None and last_dir(inpath) != (od := dirs.pop()):
+                    hint = (" – the outputs turn back along the input: move the splitter back to where the cables "
+                            "actually diverge" if last_dir(inpath) == tuple(-x for x in od) else "")
+                    warns.append(f"[{bid}] splitter {n.get('id','')}: input must enter the long side opposite the outputs{hint}")
                 ls = [branch_length_m(br, nf[id(n)], d)[0] for br in n["outputs"]]
                 if max(ls) - min(ls) > max(8.0, 0.4 * max(ls)):
                     warns.append(f"[{bid}] splitter {n.get('id','')} outputs differ a lot ({min(ls):.0f}–{max(ls):.0f} m): "
@@ -211,6 +316,18 @@ def lint(d, cfg, results):
                                  "– tell the user and offer one recalculated alternative")
         if any(c.get("value") is None for c in couplers_of(b["tree"])):
             errs.append(f"[{bid}] couplers without value — run optimize")
+
+    # ---- the stronger booster should take the group with the longest runs
+    if len(d["boosters"]) > 1 and all(results.get(b["id"]) for b in d["boosters"]):
+        worst = {b["id"]: max(r["total_db"] for r in results[b["id"]]) for b in d["boosters"]}
+        P = {b["id"]: float(b["power_dbm"]) for b in d["boosters"]}
+        for x in d["boosters"]:
+            for y in d["boosters"]:
+                if P[x["id"]] > P[y["id"]] and worst[x["id"]] + 0.5 < worst[y["id"]]:
+                    warns.append(f"[{x['id']}/{y['id']}] the weaker booster {y['id']} ({P[y['id']]:g} dBm) has the longer "
+                                 f"runs (worst loss {worst[y['id']]:.1f} dB vs {worst[x['id']]:.1f} dB) – give the stronger "
+                                 "unit the group with the longer riser / runs")
+    warns.extend(layout_warnings(d, cfg))
 
     for a in ants:
         if a not in wired:

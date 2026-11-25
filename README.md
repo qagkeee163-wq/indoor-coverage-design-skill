@@ -16,6 +16,12 @@ drawings + bill of materials, in **English and Chinese**.
 
 The [dated supplement in SKILL.md](SKILL.md#补充规则2026-11-24) adds the owner's five requirements while retaining applicable existing guidance: establish coverage area before layout; space antennas evenly using coverage needs; fix booster locations and routing/components before power selection; use actual regional models and required bands; and use this owner's 5D/LMR400 project conventions with frequency-specific loss data. Added cable to attenuate one excessive branch requires confirmation. See [regional equipment](references/regional-equipment.md). This update also syncs the previously reviewed local multi-floor, panel-antenna and strict-output checks.
 
+## Supplement (2026-11-25)
+
+Lessons from a five-floor residential project in France ([SKILL.md](SKILL.md#补充规则2026-11-25法国住宅项目复盘), [case review](references/reviewed-case-nimes.md)): keep indoor antennas isolated from the donor and avoid overlapping coverage (self-oscillation); wall-mount panels and feed them from the back on the long side; no back-and-forth cabling — move the antenna or device instead; one booster per block of adjacent floors with the same wiring on every floor; give the stronger booster the longer runs; antennas per unit (Hi20 ≈ 6–7, Hi23 ≈ 8–9); read bands from the customer's test report; separate design and customer versions with a fixed customer order and a simple connection diagram.
+
+New in the tool: `check` flags back-and-forth cable, overlapping coverage, too many antennas for the model and a weaker booster on the longer runs; `report` adds a connection diagram; `report --client` writes the customer version (no labels, arrows, coverage, lengths or power table; outline-only plans when `floors[].outline` is set).
+
 ## What it does
 
 - **Step-by-step workflow** with confirmation at design decisions that need user input (`SKILL.md`).

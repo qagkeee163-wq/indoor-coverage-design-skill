@@ -79,7 +79,8 @@ def dev_str(dev, lang):
     return ", ".join(parts) or "—"
 
 
-def write_bom(d, cfg, lang, out):
+def write_bom(d, cfg, lang, out, client=False):
+    """client=True: customer BOM – quantities only, no cable-loss spec, booster output or design assumptions."""
     l = L[lang]; c = cfg["cable"]
     rows, tot = compute_bom(d, cfg)
     total = tot["indoor"] + tot["donor"]; order = math.ceil(total * (1 + c["order_margin"]) / 10) * 10
@@ -98,7 +99,7 @@ def write_bom(d, cfg, lang, out):
         for v in sorted(cfg["splitters"]):
             w.writerow([l["splitter"], f"1:{v}", tot.get(("splitter", v), 0), l["pcs"], ""])
         nm = c["name"]
-        w.writerow([f"{nm} {l['indoor']}", loss_str(cfg, bands(d, cfg)), round(tot["indoor"], 1), l["m"], f"≈ {tot['indoor']*FT:,.0f} ft"])
+        w.writerow([f"{nm} {l['indoor']}", "" if client else loss_str(cfg, bands(d, cfg)), round(tot["indoor"], 1), l["m"], f"≈ {tot['indoor']*FT:,.0f} ft"])
         if tot["rise"]:
             w.writerow([f"  {T[lang]['rise']}", "", round(tot["rise"], 1), l["m"], ""])
         if tot["extra"]:
@@ -110,7 +111,10 @@ def write_bom(d, cfg, lang, out):
         w.writerow([l["conn"], "", nconn, l["pcs"], l["conn_n"].format(s=tot["seg"], d=len(rows))])
         w.writerow([]); w.writerow([l["per"]]); w.writerow(l["pcols"])
         for r in rows:
-            w.writerow([r["id"], f"{r['model'] + ' ' if r['model'] else ''}{r['P']:g} dBm", r["n_ant"], dev_str(r["dev"], lang), round(r["indoor"]), round(r["donor"])])
+            spec = (r["model"] or f"{r['P']:g} dBm") if client else f"{r['model'] + ' ' if r['model'] else ''}{r['P']:g} dBm"
+            w.writerow([r["id"], spec, r["n_ant"], dev_str(r["dev"], lang), round(r["indoor"]), round(r["donor"])])
+        if client:
+            return rows, tot, order
         w.writerow([]); w.writerow([l["assum"]])
         for a in l["a"]:
             w.writerow([a.format(riser=c["riser_m"], slack=c["slack_per_antenna_m"], roof=c["donor_roof_m"])])

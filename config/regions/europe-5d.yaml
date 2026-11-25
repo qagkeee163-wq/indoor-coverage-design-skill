@@ -29,11 +29,13 @@ boosters:
   - {power_dbm: 23, color: [185, 25, 40]}    # red
   - {power_dbm: 20, color: [184, 134, 11]}   # gold
 booster_models:        # user-supplied F23H1-6S-V04 table; keep in sync with the latest product sheet
-  - {model: Hi20-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total}
-  - {model: Hi20-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total}
-  - {model: Hi23-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total}
-  - {model: Hi23-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total}
+  - {model: Hi20-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total, antennas_typical: [6, 7]}
+  - {model: Hi20-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 70, ul_max_dbm: 17, dl_max_dbm: 20, power_basis: total, antennas_typical: [6, 7]}
+  - {model: Hi23-5S-PLUS CE, bands: [800, 900, 1800, 2100, 2600],      gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total, antennas_typical: [8, 9]}
+  - {model: Hi23-6S-PLUS CE, bands: [700, 800, 900, 1800, 2100, 2600], gain_ul_db: 65, gain_dl_db: 75, ul_max_dbm: 20, dl_max_dbm: 23, power_basis: total, antennas_typical: [8, 9]}
 # power_basis: total = dl_max_dbm is the whole-unit DL output, NOT per band / per carrier.
+# antennas_typical: [usual, max] antennas one unit should feed (user, 2026-11-25: Hi20 about 6–7, Hi23 about 8–9).
+#   check warns above `usual` and errors above `max`.
 
 couplers:            # value -> losses (dB) and drawing color
   5:  {coupled: 5.0,  through: 2.15, color: [0, 150, 70]}    # green
@@ -51,6 +53,11 @@ ceiling_antenna:     # rules of thumb for step 1
   wall_penetration_m: [3, 5]
 panel_antenna_range_m: [15, 20]
 panel_half_width_m: 5           # ~10 m total lateral width for a first check
+
+layout_checks:       # added 2026-11-25 (Nîmes review); warnings only
+  max_detour_m: 1.5              # back-and-forth cable (来回布线) beyond the direct right-angle route → move device/antenna
+  panel_overlap_warn_ratio: 0.2  # share of the smaller panel footprint that may overlap (edges only)
+  ceiling_min_spacing_ratio: 1.0 # ceiling antennas closer than this × radius overlap heavily
 
 margins:             # step 3 (from the original workflow notes)
   end_db: [2, 3]

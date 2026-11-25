@@ -22,6 +22,24 @@
 - 修复：多台主机一起优化时，失败一台不再丢掉其他主机的结果。
 - 新增 `tests/run_tests.py` 回归测试和标准答案，网页版也要与它的结果一致。
 
+## 本次补充（2026-11-25，法国住宅项目复盘）
+
+新增[八条补充规则](SKILL.md#补充规则2026-11-25法国住宅项目复盘)和[项目复盘](references/reviewed-case-nimes.md)：
+
+- 天线排布考虑自激：室内天线远离并背对施主天线；覆盖尽量不重叠，边缘可以有一点。
+- 板状天线贴墙、从背面长边接线。
+- 不来回布线：改了进线方向就微调天线或器件位置。
+- 每台主机带相邻楼层，各层接法一致；大功率给线长的组；Hi20 约带 6–7 支，Hi23 约 8–9 支。
+- 频段从客户测试报告读。
+- 设计版和客户版分开；客户版顺序固定，每次附一张最简单的连接图。
+
+工具新增：
+
+- `check` 提示来回布线、覆盖重叠、型号带天线数超限、弱主机带长线组。
+- `report` 增加连接图。
+- `report --client` 另出客户版（去掉标注、箭头、覆盖范围、线长和功率表；设了 `floors[].outline` 时平面图只画外框）。
+- `connection` 命令只出连接图。
+
 ## 包含什么
 
 | 文件 | 作用 |
@@ -44,7 +62,8 @@ python scripts/coverage.py areas    项目/design.json   # 第 0 步：区域划
 python scripts/coverage.py layout   项目/design.json   # 第 1 步：天线布置图 + 覆盖圈
 python scripts/coverage.py optimize 项目/design.json   # 自动选耦合器 5/8/10 dB
 python scripts/coverage.py check    项目/design.json   # 每支天线功率 + 设计规则检查
-python scripts/coverage.py report   项目/design.json   # 出全部图纸、CSV、材料清单（zh/ 和 en/）
+python scripts/coverage.py report   项目/design.json   # 出全部图纸、连接图、CSV、材料清单（zh/ 和 en/）
+python scripts/coverage.py report   项目/design.json --client   # 另出客户版到 output/<语言>/client/
 ```
 
 欧洲项目加 `--config 项目/europe-5d.yaml`。
